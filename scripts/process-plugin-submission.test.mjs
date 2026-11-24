@@ -198,7 +198,25 @@ test('scanner ignores comments and defensive credential denylist while catching 
   assert.equal(stripped.includes('https://a.b//c'), true);
 
   assert.equal(hasCredentialTheftRisk("const SENSITIVE_BASENAMES = new Set(['login data', 'local state']);"), false);
+  const longDenylist = [
+    'const SENSITIVE_BASENAMES = new Set([',
+    ...Array.from({ length: 22 }, (_, i) => `  'item-${i}.json',`),
+    "  'login data',",
+    "  'login data-journal',",
+    "  'local state',",
+    "  'web data',",
+    ']);',
+  ].join('\n');
+  assert.equal(hasCredentialTheftRisk(longDenylist), false);
   assert.equal(hasCredentialTheftRisk("fs.readFileSync(path.join(dir, 'Chrome/User Data/Default/Login Data'));"), true);
+  assert.equal(hasCredentialTheftRisk("fs.readFileSync(path.join(dir, 'Login Data-journal'));"), true);
+  const nonListGap = [
+    'const sensitive = true;',
+    ...Array.from({ length: 15 }, () => 'const a = 1;'),
+    "const f = 'login data';",
+  ].join('\n');
+  assert.equal(hasCredentialTheftRisk(nonListGap), true);
+  assert.equal(hasCredentialTheftRisk("const SENSITIVE_BASENAMES = new Set(['Default/Login Data']);"), true);
   assert.equal(hasCredentialTheftRisk("const SENSITIVE_BASENAMES = []; const x = 'CryptUnprotectData';"), true);
 
   const evalZip = buildStoredZip({

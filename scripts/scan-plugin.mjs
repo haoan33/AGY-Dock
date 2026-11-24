@@ -31,7 +31,8 @@ const HARD_CREDENTIAL_RE = /(?:CryptUnprotectData|\bcmdkey\b|\bvaultcmd\b|\.ssh[
 const BROWSER_CRED_FILE_RE = /(?:Login Data|Local State|Web Data)/i;
 const DEFENSIVE_DENYLIST_RE = /(?:sensitive|deny|block|forbid|blacklist|restricted|excluded|ignored|disallow|protected)/i;
 const CRED_ACCESS_CONTEXT_RE = /(?:user data|\bchrome\b|\bedge\b|\bbrave\b|\bopera\b|\bappdata\b|localappdata|readfile|createreadstream|copyfile|\bsqlite\b|\bdatabase\b|\bopen\s*\()/i;
-const QUOTED_CRED_BASENAME_RE = /(['"`])(?:login data|local state|web data)\1/gi;
+const QUOTED_CRED_BASENAME_RE = /(['"`])(?:login data|local state|web data)(?:-(?:journal|wal|shm))?\1/gi;
+const PURE_LIST_ENTRY_LINE_RE = /^\s*(?:(?:['"`][^'"`\r\n]*['"`]|\/[^/\r\n]+\/[gimsuy]*)\s*,?\s*)+$/;
 const DESTRUCTIVE_OS_RE = /(?:\brm\s+-rf\b|\brmdir\s+\/s\b|\brd\s+\/s\s+\/q\b|\bdel\s+\/f\s+\/s\b|\breg\s+(?:add|delete)\b|\bschtasks\b|\bsc\s+(?:create|delete)\b|\bbcdedit\b|\bvssadmin\b|\bSet-MpPreference\b|\bAdd-MpPreference\b)/i;
 const OUTBOUND_NET_API_RE = /(?:\bfetch\s*\(|https?\.(?:request|get)\s*\(|new\s+WebSocket\s*\(|XMLHttpRequest|Invoke-WebRequest|Invoke-RestMethod|urllib\.request|\brequests\.(?:get|post|put|request)\b|\baxios\b|net\.connect|tls\.connect)/i;
 const CHAT_OR_BRAIN_RE = /(?:\.gemini[\\/](?:antigravity[\\/])?(?:conversations|brain)|state\.vscdb|conversation_history|chat_history)/i;
@@ -241,13 +242,27 @@ export function hasCredentialTheftRisk(codeText) {
     const withoutBenignQuoted = line.replace(QUOTED_CRED_BASENAME_RE, ' ');
     if (BROWSER_CRED_FILE_RE.test(withoutBenignQuoted)) return true;
 
-    const start = Math.max(0, idx - 12);
-    const end = Math.min(lines.length - 1, idx + 2);
-    let hasDefensiveContext = false;
-    for (let j = start; j <= end; j += 1) {
-      if (DEFENSIVE_DENYLIST_RE.test(lines[j])) {
-        hasDefensiveContext = true;
-        break;
+    let hasDefensiveContext = DEFENSIVE_DENYLIST_RE.test(line);
+    if (!hasDefensiveContext) {
+      const end = Math.min(lines.length - 1, idx + 2);
+      for (let j = idx + 1; j <= end; j += 1) {
+        if (DEFENSIVE_DENYLIST_RE.test(lines[j])) {
+          hasDefensiveContext = true;
+          break;
+        }
+      }
+    }
+    if (!hasDefensiveContext) {
+      const shortStart = Math.max(0, idx - 12);
+      const longStart = Math.max(0, idx - 120);
+      for (let j = idx - 1; j >= longStart; j -= 1) {
+        if (DEFENSIVE_DENYLIST_RE.test(lines[j])) {
+          hasDefensiveContext = true;
+          break;
+        }
+        if (j < shortStart && lines[j].trim() !== '' && !PURE_LIST_ENTRY_LINE_RE.test(lines[j])) {
+          break;
+        }
       }
     }
     if (!hasDefensiveContext) return true;
