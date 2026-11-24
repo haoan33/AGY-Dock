@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-24T14:31:38Z",
+  "updatedAt": "2026-11-24T15:27:06Z",
   "plugins": [
     {
       "id": "office-viewer",
@@ -76,16 +76,16 @@
     {
       "id": "obsidian-prism-lite",
       "name": "Obsidian Prism Lite (黑曜棱镜轻量版)",
-      "version": "1.5.6",
+      "version": "1.5.7",
       "author": "RMvdesi (精简适配: HaoAn)",
       "description": "基于 Obsidian Prism 精简重构的轻量光学界面美化与 WebGPU 离屏渲染动效插件，包含四套深浅配色、磨砂切面质感、多线程离屏首屏波纹与推理深度滑块、边缘微光提醒、代码块折叠及侧栏项目/对话滑块切换。",
       "type": "node-cdp",
-      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/obsidian-prism-lite-v1.5.6/obsidian-prism-lite-v1.5.6.zip",
+      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/obsidian-prism-lite-v1.5.7/obsidian-prism-lite-v1.5.7.zip",
       "homepage": "https://github.com/RMvdesi/obsidian-prism",
-      "changelog": "- 将侧栏「项目 / 对话」切换条固定在列表上方。滚动列表时，切换条保持可见，不再随列表移动或被渐隐遮罩淡化。",
-      "sha256": "c10d14c9863f69feebff19a658004bc584eeea9250826336bc675d125cca4bb9",
-      "size": 236191,
-      "releaseTag": "obsidian-prism-lite-v1.5.6"
+      "changelog": "- 首页点阵水波纹鼠标移动改为立即转发至后台渲染线程（保留同帧合并），消除多余一帧的跟手延迟。\n- 在管理设置页新增「动效渲染帧率」开关（支持 60 FPS 均衡省电 / 120 FPS 高刷丝滑，默认 60 FPS），联动首页水波纹与模型图标。\n- AI 流式回复文字淡入升级为基于浏览器高亮层的逐块柔和浮现（跳过代码块，保留旧环境回退）。",
+      "sha256": "a2a6035057e592bf6cb6599d92de01d1d95dd69df0d232ef5bffc7f35d7288a7",
+      "size": 239232,
+      "releaseTag": "obsidian-prism-lite-v1.5.7"
     },
     {
       "id": "rmvdesi.obsidian-prism",
