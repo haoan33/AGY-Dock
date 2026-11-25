@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-24T15:27:06Z",
+  "updatedAt": "2026-11-25T03:03:45Z",
   "plugins": [
     {
       "id": "office-viewer",
@@ -48,15 +48,15 @@
     {
       "id": "agy-quota-badge",
       "name": "Antigravity Quota Badge",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "author": "HaoAn",
       "description": "在模型选择器旁显示 5 小时与周额度，悬停查看原生剩余额度和重置倒计时，支持低饱和/高饱和与自定义配色及刷新频率配置。",
       "type": "node-cdp",
-      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/agy-quota-badge-v1.2.0.zip",
+      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/agy-quota-badge-v1.2.1.zip",
       "homepage": "https://github.com/haoan33/AGY-Dock",
-      "changelog": "优化原生额度实时同步机制：主动拉取均强制走服务端最新读数（不再读本地旧缓存），冷却期内触发的生成结束刷新自动排队补刷；新增窗口可见时自适应周期轮询（默认生成中 12s / 空闲 30s / 冷却 5s），并在设置页新增「额度刷新频率」选项（实时优先 / 均衡实时 / 省流模式）。",
-      "sha256": "7aa684977d9ca1532d87fb5ce233a91f34eef370e0d557f79c33173f2b4d9918",
-      "size": 35931,
+      "changelog": "修复首次打开 Antigravity 停留在首页时额度图标可能不显示、必须手动点进任意会话才会出现的问题：冷启动等待首页界面就绪后再挂载，不再将尚未加载完成的首页误判为忽略页面，并补齐加载中重试与瞬态错误恢复机制。",
+      "sha256": "b75cf2af5e182bca78d1c60784cf8a397e33657d0fb934f91147911cc0bd38d4",
+      "size": 37022,
       "releaseTag": "v2.4.0"
     },
     {
