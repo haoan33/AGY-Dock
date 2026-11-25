@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-25T03:05:36Z",
+  "updatedAt": "2026-11-25T14:04:49Z",
   "plugins": [
     {
       "id": "office-viewer",
@@ -62,15 +62,15 @@
     {
       "id": "agy-pixel-pets",
       "name": "AGY Pixel Pets (显卡像素小宠物)",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "author": "RMvdesi (独立显卡重构: HaoAn)",
-      "description": "独立像素桌面宠物插件，使用独立后台线程与显卡离屏绘制小螃蟹、小猫及迷你蟹群，支持鼠标逗弄、拎起抛甩、挤压拉伸弹性动效与 AI 状态联动。",
+      "description": "独立像素桌面宠物插件，由独立后台线程与显卡绘制小螃蟹、小猫、小白龙、小蓝鲸及装扮迷你蟹群，支持连戳脾气、投喂零食、叠罗汉、日常小剧场及斜杠命令联动。",
       "type": "node-cdp",
-      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/agy-pixel-pets-v1.0.1.zip",
+      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/agy-pixel-pets-v1.1.0.zip",
       "homepage": "https://github.com/RMvdesi/obsidian-prism",
-      "changelog": "- 修复展开或收起侧栏时宠物区域偶现整块纯白矩形遮挡的问题：合并侧栏动画期间的连续尺寸变动（停稳后再统一调整画布），并在调整尺寸时保留同一显卡设备上的画布配置。\n- 增加透明底色锁定与显卡异常恢复机制：遇到显卡掉线或绘制异常时立即隐身并自动更换干净画布切换至 WebGL2 备用模式继续绘制，彻底杜绝白块残影。",
-      "sha256": "4f9fe56e39b293a0409215d4410f7a39ef7d534eff512238f12277d5a2c6e5f5",
-      "size": 55129,
+      "changelog": "- 新增小白龙（喷火/振翅）、小蓝鲸（喷水柱/面包歇息）与 3 只装扮迷你小蟹（牛仔帽/墨镜/巫师帽），设置页新增四宠同堂、全家福大派对及单宠模式。\n- 补齐日常小剧场（种花、逗蝴蝶、拆信、擦杯子、干饭/吃鱼、小猫舔毛与追红点、深夜喝热饮与睡眠鼻泡）、搞笑彩蛋（着火喝水、挥荧光棒、拿麦唱歌、警灯）、双宠蹭蹭合演与迷你蟹骑头/追逐剧情。\n- 升级互动体验：5 段连戳脾气与生闷气、右键喂甜甜圈与 Alt+左键喂咖啡消气、长按抚摸、4 层叠罗汉平衡与堆叠小猫连点 4 下彩虹变色、打字问号/感叹号、菜单弹出探头偷看、角落小摆件及 9 大斜杠命令专属剧场。\n- 性能与省电优化：单循环统一调度与显卡单次合并绘制、睡眠 10fps / 静立 15fps / 散步剧场 30fps 分级降频，彩虹效果直接由显卡计算，零重复重绘与零多余消息传递。",
+      "sha256": "d2b1cc7f3926c1fc00a435fd71c8bf5dcbcf9674919e10861b4469f9c22da494",
+      "size": 74574,
       "releaseTag": "v2.4.0"
     },
     {
