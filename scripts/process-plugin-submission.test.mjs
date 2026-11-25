@@ -8,7 +8,75 @@ import {
   selectValidPluginFromReleases,
 } from './process-plugin-submission.mjs';
 import { hasCredentialTheftRisk, scanZipBuffer, stripComments } from './scan-plugin.mjs';
-import { isNewerSemver, pickBestReleaseAsset } from './sync-third-party-releases.mjs';
+import {
+  isNewerSemver,
+  pickBestReleaseAsset,
+  syncCatalogPlugins,
+} from './sync-third-party-releases.mjs';
+
+function buildDeflatedZip(files) {
+  const localParts = [];
+  const cdParts = [];
+  let offset = 0;
+
+  for (const [name, content] of Object.entries(files)) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const rawBuf = Buffer.isBuffer(content) ? content : Buffer.from(String(content), 'utf8');
+    const compBuf = zlib.deflateRawSync(rawBuf);
+    const crc = zlib.crc32(rawBuf);
+
+    const local = Buffer.alloc(30 + nameBuf.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(8, 8); // deflate
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(compBuf.length, 18);
+    local.writeUInt32LE(rawBuf.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28);
+    nameBuf.copy(local, 30);
+    localParts.push(local, compBuf);
+
+    const cd = Buffer.alloc(46 + nameBuf.length);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4);
+    cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(0, 8);
+    cd.writeUInt16LE(8, 10); // deflate
+    cd.writeUInt16LE(0, 12);
+    cd.writeUInt16LE(0, 14);
+    cd.writeUInt32LE(crc, 16);
+    cd.writeUInt32LE(compBuf.length, 20);
+    cd.writeUInt32LE(rawBuf.length, 24);
+    cd.writeUInt16LE(nameBuf.length, 28);
+    cd.writeUInt16LE(0, 30);
+    cd.writeUInt16LE(0, 32);
+    cd.writeUInt16LE(0, 34);
+    cd.writeUInt16LE(0, 36);
+    cd.writeUInt32LE(0, 38);
+    cd.writeUInt32LE(offset, 42);
+    nameBuf.copy(cd, 46);
+    cdParts.push(cd);
+
+    offset += local.length + compBuf.length;
+  }
+
+  const cdBuf = Buffer.concat(cdParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(cdParts.length, 8);
+  eocd.writeUInt16LE(cdParts.length, 10);
+  eocd.writeUInt32LE(cdBuf.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, cdBuf, eocd]);
+}
 
 function buildStoredZip(files) {
   const localParts = [];
@@ -255,4 +323,179 @@ test('sync-third-party-releases skips prereleases and ranks stable semver higher
   const picked = pickBestReleaseAsset(releases, 'alice.tool');
   assert.equal(picked?.version, '1.0.8');
   assert.equal(picked?.downloadUrl, 'https://example.invalid/stable.zip');
+});
+
+test('scanner catches oversized compressed PE binary, oversized code file, zip-slip path, and nested manifest spoof', () => {
+  const oversizedPeZip = buildDeflatedZip({
+    'agy-plugin.json': JSON.stringify({ schemaVersion: 1, id: 'alice.tool', command: 'node', launchArgs: [] }),
+    'payload.dat': Buffer.concat([Buffer.from('MZ\x90\x00'), Buffer.alloc(5 * 1024 * 1024, 0x41)]),
+  });
+  const peReport = scanZipBuffer(oversizedPeZip);
+  assert.equal(peReport.blocked, true);
+  assert.ok(peReport.findings.some((f) => f.code === 'BANNED_PE_BINARY'));
+
+  const oversizedCodeZip = buildDeflatedZip({
+    'agy-plugin.json': JSON.stringify({ schemaVersion: 1, id: 'alice.tool', command: 'node', launchArgs: [] }),
+    'huge.js': Buffer.from(`console.log("ok");\n${'a'.repeat(5 * 1024 * 1024)}`),
+  });
+  const codeReport = scanZipBuffer(oversizedCodeZip);
+  assert.equal(codeReport.blocked, true);
+  assert.ok(codeReport.findings.some((f) => f.code === 'OVERSIZED_CODE_FILE'));
+
+  const slipZip = buildStoredZip({
+    'agy-plugin.json': JSON.stringify({ schemaVersion: 1, id: 'alice.tool', command: 'node', launchArgs: [] }),
+    '../escape.js': 'console.log(1);',
+  });
+  const slipReport = scanZipBuffer(slipZip);
+  assert.equal(slipReport.blocked, true);
+  assert.ok(slipReport.findings.some((f) => f.code === 'UNSAFE_ARCHIVE_PATH'));
+
+  const nestedSpoofZip = buildStoredZip({
+    'agy-plugin.json': JSON.stringify({ schemaVersion: 1, id: 'alice.tool', command: 'node', launchArgs: [] }),
+    'fixtures/agy-plugin.json': JSON.stringify({ schemaVersion: 1, id: 'alice.tool', type: 'exe-cdp', command: 'evil.exe' }),
+  });
+  const nestedReport = scanZipBuffer(nestedSpoofZip);
+  assert.equal(nestedReport.blocked, false);
+});
+
+test('syncCatalogPlugins isolates per-plugin errors, validates manifests, supports non-standard asset names, clears stale changelogs, and skips >100MB assets', async () => {
+  const validV2Zip = buildStoredZip({
+    'agy-plugin.json': JSON.stringify({
+      schemaVersion: 1,
+      id: 'bob.good',
+      version: '2.0.0',
+      type: 'node-cdp',
+      command: 'node',
+      launchArgs: ['index.js'],
+    }),
+    'index.js': 'console.log("v2");',
+  });
+
+  const nonStandardZip = buildStoredZip({
+    'agy-plugin.json': JSON.stringify({
+      schemaVersion: 1,
+      id: 'carol.custom',
+      version: '1.1.0',
+      type: 'node-cdp',
+      command: 'node',
+      launchArgs: ['index.js'],
+    }),
+    'index.js': 'console.log("custom");',
+  });
+
+  const badManifestZip = buildStoredZip({
+    'agy-plugin.json': JSON.stringify({
+      schemaVersion: 1,
+      id: 'dave.wrong-id',
+      version: '1.1.0',
+    }),
+  });
+
+  const docsOnlyZip = buildStoredZip({ 'README.md': '# docs' });
+
+  const catalogPlugins = [
+    {
+      id: 'alice.broken',
+      name: 'Broken',
+      version: '1.0.0',
+      upstreamRepo: 'alice/broken',
+      changelog: 'old',
+    },
+    {
+      id: 'dave.mismatched',
+      name: 'Mismatched',
+      version: '1.0.0',
+      upstreamRepo: 'dave/mismatched',
+      changelog: 'old',
+    },
+    {
+      id: 'eve.huge',
+      name: 'Huge',
+      version: '1.0.0',
+      upstreamRepo: 'eve/huge',
+      changelog: 'old',
+    },
+    {
+      id: 'bob.good',
+      name: 'Good',
+      version: '1.0.0',
+      upstreamRepo: 'bob/good',
+      changelog: 'stale v1 changelog',
+    },
+    {
+      id: 'carol.custom',
+      name: 'Custom',
+      version: '1.0.0',
+      upstreamRepo: 'carol/custom',
+      changelog: 'old v1',
+    },
+  ];
+
+  const downloadedUrls = [];
+  const updated = await syncCatalogPlugins(catalogPlugins, {
+    isOfficial: false,
+    fetchReleasesFn: async (repo) => {
+      if (repo === 'alice/broken') throw new Error('ETIMEDOUT');
+      if (repo === 'dave/mismatched') {
+        return [{
+          draft: false,
+          prerelease: false,
+          tag_name: 'v1.1.0',
+          body: 'bad manifest',
+          assets: [{ name: 'dave.mismatched-v1.1.0.zip', size: badManifestZip.length, browser_download_url: 'https://example.invalid/dave.zip' }],
+        }];
+      }
+      if (repo === 'eve/huge') {
+        return [{
+          draft: false,
+          prerelease: false,
+          tag_name: 'v2.0.0',
+          body: 'huge file',
+          assets: [{ name: 'eve.huge-v2.0.0.zip', size: 150 * 1024 * 1024, browser_download_url: 'https://example.invalid/huge.zip' }],
+        }];
+      }
+      if (repo === 'bob/good') {
+        return [{
+          draft: false,
+          prerelease: false,
+          tag_name: 'v2.0.0',
+          published_at: '2026-11-25T10:00:00Z',
+          body: '',
+          assets: [{ name: 'bob.good-v2.0.0.zip', size: validV2Zip.length, browser_download_url: 'https://example.invalid/bob.zip' }],
+        }];
+      }
+      if (repo === 'carol/custom') {
+        return [{
+          draft: false,
+          prerelease: false,
+          tag_name: 'v1.1.0',
+          published_at: '2026-11-25T10:05:00Z',
+          body: 'Updated with non-standard zip name',
+          assets: [
+            { name: '00-docs.zip', size: docsOnlyZip.length, browser_download_url: 'https://example.invalid/docs.zip' },
+            { name: 'bundle.zip', size: nonStandardZip.length, browser_download_url: 'https://example.invalid/bundle.zip' },
+          ],
+        }];
+      }
+      return [];
+    },
+    downloadBufferFn: async (url) => {
+      downloadedUrls.push(url);
+      if (url.endsWith('/dave.zip')) return badManifestZip;
+      if (url.endsWith('/bob.zip')) return validV2Zip;
+      if (url.endsWith('/docs.zip')) return docsOnlyZip;
+      if (url.endsWith('/bundle.zip')) return nonStandardZip;
+      throw new Error(`unexpected download ${url}`);
+    },
+  });
+
+  assert.equal(updated, 2);
+  assert.equal(catalogPlugins[0].version, '1.0.0');
+  assert.equal(catalogPlugins[1].version, '1.0.0');
+  assert.equal(catalogPlugins[2].version, '1.0.0');
+  assert.equal(downloadedUrls.includes('https://example.invalid/huge.zip'), false);
+  assert.equal(catalogPlugins[3].version, '2.0.0');
+  assert.equal(catalogPlugins[3].changelog, '');
+  assert.equal(catalogPlugins[4].version, '1.1.0');
+  assert.equal(catalogPlugins[4].downloadUrl, 'https://example.invalid/bundle.zip');
 });

@@ -39,6 +39,73 @@ const CHAT_OR_BRAIN_RE = /(?:\.gemini[\\/](?:antigravity[\\/])?(?:conversations|
 const OUTSIDE_FS_RE = /(?:\\Desktop\b|\\Documents\b|\\Downloads\b|\\Startup\b|C:[\\/]Windows|ProgramData|USERPROFILE|\$env:USERPROFILE|\$env:APPDATA)/i;
 const MANAGER_BRIDGE_RE = /(?:AGY_BRIDGE_URL|AGY_BRIDGE_TOKEN|\/v1\/antigravity\/children\/kill)/i;
 
+function inflateDeflatePrefix(rawSlice) {
+  for (const prefixLen of [64, 256, 1024, 16]) {
+    const slice = rawSlice.subarray(0, Math.min(rawSlice.length, prefixLen));
+    if (slice.length === 0) continue;
+    try {
+      const out = zlib.inflateRawSync(slice, {
+        finishFlush: zlib.constants.Z_SYNC_FLUSH,
+        maxOutputLength: 2 * 1024 * 1024,
+      });
+      if (out.length > 0) return out.subarray(0, 64);
+    } catch {}
+  }
+  return Buffer.alloc(0);
+}
+
+export function readManifestFromZipBuffer(buffer) {
+  let eocdOffset = -1;
+  const minOffset = Math.max(0, buffer.length - 65557);
+  for (let i = buffer.length - 22; i >= minOffset; i -= 1) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error('无效的 ZIP 插件包（缺少目录尾）');
+  const cdSize = buffer.readUInt32LE(eocdOffset + 12);
+  const cdOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
+  let ptr = cdOffset;
+  let bestMatch = null;
+  for (let i = 0; i < totalEntries && ptr < cdOffset + cdSize; i += 1) {
+    if (buffer.readUInt32LE(ptr) !== 0x02014b50) throw new Error('无效的 ZIP 中央目录条目');
+    const compression = buffer.readUInt16LE(ptr + 10);
+    const compSize = buffer.readUInt32LE(ptr + 20);
+    const uncompSize = buffer.readUInt32LE(ptr + 24);
+    const nameLen = buffer.readUInt16LE(ptr + 28);
+    const extraLen = buffer.readUInt16LE(ptr + 30);
+    const commentLen = buffer.readUInt16LE(ptr + 32);
+    const lhOffset = buffer.readUInt32LE(ptr + 42);
+    const name = buffer.subarray(ptr + 46, ptr + 46 + nameLen).toString('utf8').replace(/\\/g, '/').replace(/^\.\//, '');
+    ptr += 46 + nameLen + extraLen + commentLen;
+    const depth = name === 'agy-plugin.json' ? 0 : /^[^/]+\/agy-plugin\.json$/.test(name) ? 1 : -1;
+    if (depth < 0) continue;
+    if (!bestMatch || depth < bestMatch.depth) {
+      bestMatch = { depth, compression, compSize, uncompSize, lhOffset, name };
+      if (depth === 0) break;
+    }
+  }
+  if (!bestMatch) throw new Error('压缩包内未找到 agy-plugin.json 清单');
+  if (bestMatch.uncompSize > MAX_SCAN_FILE_BYTES) {
+    throw new Error('agy-plugin.json 清单文件过大');
+  }
+  if (buffer.readUInt32LE(bestMatch.lhOffset) !== 0x04034b50) {
+    throw new Error(`无效的 ZIP 本地文件头: ${bestMatch.name}`);
+  }
+  const lhNameLen = buffer.readUInt16LE(bestMatch.lhOffset + 26);
+  const lhExtraLen = buffer.readUInt16LE(bestMatch.lhOffset + 28);
+  const dataStart = bestMatch.lhOffset + 30 + lhNameLen + lhExtraLen;
+  const raw = buffer.subarray(dataStart, dataStart + bestMatch.compSize);
+  let data;
+  if (bestMatch.compression === 0) data = Buffer.from(raw);
+  else if (bestMatch.compression === 8) data = zlib.inflateRawSync(raw, { maxOutputLength: MAX_SCAN_FILE_BYTES });
+  else throw new Error(`不支持的 ZIP 压缩方式 (${bestMatch.compression}): ${bestMatch.name}`);
+  const text = data.toString('utf8').replace(/^\uFEFF/, '');
+  return JSON.parse(text);
+}
+
 function readZipEntries(buffer) {
   let eocdOffset = -1;
   const minOffset = Math.max(0, buffer.length - 65557);
@@ -74,15 +141,32 @@ function readZipEntries(buffer) {
     const lhExtraLen = buffer.readUInt16LE(localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + lhNameLen + lhExtraLen;
     const rawSlice = buffer.subarray(dataStart, dataStart + compSize);
+    let oversized = uncompSize > MAX_SCAN_FILE_BYTES;
     let data = Buffer.alloc(0);
-    if (uncompSize <= MAX_SCAN_FILE_BYTES) {
+    if (!oversized) {
       if (compression === 0) data = Buffer.from(rawSlice);
-      else if (compression === 8) data = zlib.inflateRawSync(rawSlice);
-      else throw new Error(`不支持的 ZIP 压缩方式 (${compression}): ${name}`);
+      else if (compression === 8) {
+        try {
+          data = zlib.inflateRawSync(rawSlice, { maxOutputLength: MAX_SCAN_FILE_BYTES });
+        } catch (err) {
+          if (err && err.code === 'ERR_BUFFER_TOO_LARGE') {
+            oversized = true;
+            data = inflateDeflatePrefix(rawSlice);
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        throw new Error(`不支持的 ZIP 压缩方式 (${compression}): ${name}`);
+      }
     } else if (compression === 0) {
       data = Buffer.from(rawSlice.subarray(0, 64));
+    } else if (compression === 8) {
+      data = inflateDeflatePrefix(rawSlice);
+    } else {
+      throw new Error(`不支持的 ZIP 压缩方式 (${compression}): ${name}`);
     }
-    entries.push({ name, data });
+    entries.push({ name, data, uncompSize, oversized });
   }
   return entries;
 }
@@ -283,9 +367,23 @@ export function scanZipBuffer(buffer) {
   const externalDomainSet = new Set();
   let scannedFiles = 0;
   let manifestJson = null;
+  let manifestDepth = Infinity;
 
   for (const entry of entries) {
-    const rel = entry.name.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+    const rawPosix = entry.name.replace(/\\/g, '/');
+    if (rawPosix.startsWith('/') || /^[a-zA-Z]:/.test(rawPosix) || rawPosix.split('/').includes('..')) {
+      addFinding(findings, {
+        severity: 'high',
+        code: 'UNSAFE_ARCHIVE_PATH',
+        title: '压缩包包含不安全的路径穿越条目',
+        detail: '压缩包内存在越权释放路径，存在覆盖其他目录文件的风险',
+        file: rawPosix,
+        targets: [rawPosix],
+      });
+      continue;
+    }
+
+    const rel = rawPosix.replace(/^\.\//, '').replace(/^\/+/, '');
     const relLower = rel.toLowerCase();
     const ext = getExt(relLower);
 
@@ -314,18 +412,35 @@ export function scanZipBuffer(buffer) {
       continue;
     }
 
-    if (relLower === 'agy-plugin.json' || relLower.endsWith('/agy-plugin.json')) {
-      try {
-        manifestJson = JSON.parse(buf.toString('utf8').replace(/^\uFEFF/, ''));
-      } catch {}
+    const mDepth = relLower === 'agy-plugin.json' ? 0 : /^[^/]+\/agy-plugin\.json$/.test(relLower) ? 1 : -1;
+    if (mDepth >= 0) {
+      if (mDepth < manifestDepth && !entry.oversized) {
+        try {
+          manifestJson = JSON.parse(buf.toString('utf8').replace(/^\uFEFF/, ''));
+          manifestDepth = mDepth;
+        } catch {}
+      }
       continue;
     }
 
     if (!CODE_FILE_EXTS.has(ext)) continue;
+    const isVendored = isVendoredMinifiedAsset(relLower);
+    if (entry.oversized) {
+      if (!isVendored) {
+        addFinding(findings, {
+          severity: 'high',
+          code: 'OVERSIZED_CODE_FILE',
+          title: '单个代码文件超过安全扫描上限',
+          detail: '代码文件体积超过 4 MB，无法自动完整审查，已拦截',
+          file: rel,
+          targets: [rel],
+        });
+      }
+      continue;
+    }
     scannedFiles += 1;
     const text = buf.toString('utf8');
     const codeText = stripComments(text, ext);
-    const isVendored = isVendoredMinifiedAsset(relLower);
 
     if (!isVendored) {
       const isPs = ext === 'ps1' || ext === 'psm1' || ext === 'psd1';
