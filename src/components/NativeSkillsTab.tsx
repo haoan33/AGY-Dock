@@ -20,6 +20,7 @@ import {
   StatusPill,
 } from "./MotionPrimitives";
 import { formatBytes, formatErrorMessage, formatMtime } from "../lib/format";
+import { localizeScopeBadge, useI18n } from "../lib/i18n";
 import { ipc } from "../lib/ipc";
 import type { SkillDetail, SkillInfo } from "../types/ipc";
 
@@ -42,6 +43,7 @@ export function NativeSkillsTab({
   onOpenUrl,
   onToast,
 }: NativeSkillsTabProps) {
+  const { isEn, t } = useI18n();
   const reducedMotion = useReducedMotion();
   const [query, setQuery] = useState("");
   const [scopeFilter, setScopeFilter] = useState<SkillScopeFilter>("all");
@@ -115,7 +117,7 @@ export function NativeSkillsTab({
       const detail = await ipc.readSkillDetail(skill.skillMdPath);
       setDetailData(detail);
     } catch (err) {
-      onToast(`读取 Skill 介绍失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`读取 Skill 介绍失败：${formatErrorMessage(err)}`, `Failed to read skill guide: ${formatErrorMessage(err)}`), "error");
     } finally {
       setDetailLoading(false);
     }
@@ -132,11 +134,11 @@ export function NativeSkillsTab({
         setDetailData(null);
       }
       setDeleteTarget(null);
-      onToast(`已删除 Skill「${skill.name}」`, "ok");
+      onToast(t(`已删除 Skill「${skill.name}」`, `Deleted skill "${skill.name}"`), "ok");
       onRefresh();
     } catch (err) {
       setDeleteTarget(null);
-      onToast(`删除 Skill 失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`删除 Skill 失败：${formatErrorMessage(err)}`, `Failed to delete skill: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -144,7 +146,7 @@ export function NativeSkillsTab({
     try {
       await ipc.openInNotepad(filePath);
     } catch (err) {
-      onToast(`打开记事本失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开记事本失败：${formatErrorMessage(err)}`, `Failed to open Notepad: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -152,15 +154,15 @@ export function NativeSkillsTab({
     try {
       await ipc.openPathInExplorer(dirPath);
     } catch (err) {
-      onToast(`打开目录失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开目录失败：${formatErrorMessage(err)}`, `Failed to open folder: ${formatErrorMessage(err)}`), "error");
     }
   };
 
   const scopeOptions: Array<{ key: SkillScopeFilter; label: string; count: number }> = [
-    { key: "all", label: "全部", count: counts.all },
-    { key: "global", label: "全局", count: counts.global },
-    { key: "project", label: "项目局部", count: counts.project },
-    { key: "plugin", label: "扩展内置", count: counts.plugin },
+    { key: "all", label: t("全部", "All"), count: counts.all },
+    { key: "global", label: t("全局", "Global"), count: counts.global },
+    { key: "project", label: t("项目局部", "Project"), count: counts.project },
+    { key: "plugin", label: t("扩展内置", "Extension"), count: counts.plugin },
   ];
 
   return (
@@ -171,7 +173,7 @@ export function NativeSkillsTab({
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="搜索技能名称、介绍或目录..."
+            placeholder={t("搜索技能名称、介绍或目录...", "Search skill name, description, or path...")}
             className="w-[220px]"
           />
           <SegmentedControl
@@ -182,16 +184,18 @@ export function NativeSkillsTab({
               if (val !== "project" && val !== "all") setProjectFilter("all");
             }}
             layoutId="native-skills-scope"
-            ariaLabel="筛选 Skill 来源"
+            ariaLabel={t("筛选 Skill 来源", "Filter skill scope")}
           />
           {(scopeFilter === "project" || scopeFilter === "all") && projectNames.length > 0 && (
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              aria-label="按项目筛选"
+              aria-label={t("按项目筛选", "Filter by project")}
               className="agy-input h-[31px] py-0 pr-7 pl-2.5 text-[12px]"
             >
-              <option value="all">全部项目 ({projectNames.length})</option>
+              <option value="all">
+                {t(`全部项目 (${projectNames.length})`, `All Projects (${projectNames.length})`)}
+              </option>
               {projectNames.map((pname) => (
                 <option key={pname} value={pname}>
                   {pname}
@@ -206,10 +210,10 @@ export function NativeSkillsTab({
             type="button"
             onClick={onPickProject}
             className="agy-btn px-2.5 py-1.5 text-[12px]"
-            title="添加本地项目文件夹以扫描其中的项目局部 Skills"
+            title={t("添加本地项目文件夹以扫描其中的项目局部 Skills", "Add a local project folder to scan project skills")}
           >
             <FolderPlus className="h-3.5 w-3.5" />
-            <span>添加项目</span>
+            <span>{t("添加项目", "Add Project")}</span>
           </button>
           <button
             type="button"
@@ -218,7 +222,7 @@ export function NativeSkillsTab({
             className="agy-btn px-2.5 py-1.5 text-[12px]"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>刷新</span>
+            <span>{t("刷新", "Refresh")}</span>
           </button>
         </div>
       </div>
@@ -236,7 +240,9 @@ export function NativeSkillsTab({
                 transition={{ duration: 0.14, ease: MOTION_EASE }}
                 className="flex h-full min-h-[200px] items-center justify-center px-6 py-12 text-[13px] text-[var(--text-muted)]"
               >
-                {skills.length > 0 ? "未找到匹配的 Skill" : "未发现已安装的 Skills"}
+                {skills.length > 0
+                  ? t("未找到匹配的 Skill", "No matching skills found")
+                  : t("未发现已安装的 Skills", "No installed skills found")}
               </motion.div>
             ) : (
               <motion.div
@@ -276,20 +282,28 @@ export function NativeSkillsTab({
                                 : "muted"
                           }
                         >
-                          {s.scopeLabel}
+                          {localizeScopeBadge(s.scopeLabel, isEn)}
                         </StatusPill>
                         {s.isSymlink && (
                           <span
-                            title={s.linkTarget ? `联接目标: ${s.linkTarget}` : "符号链接 / 目录联接"}
+                            title={
+                              s.linkTarget
+                                ? t(`联接目标: ${s.linkTarget}`, `Target: ${s.linkTarget}`)
+                                : t("符号链接 / 目录联接", "Symlink / Directory junction")
+                            }
                             className="inline-flex items-center gap-1 rounded-md bg-[var(--warn-bg)] px-1.5 py-[1px] text-[10.5px] font-medium text-[var(--warn)]"
                           >
                             <Link2 className="h-3 w-3" />
-                            <span>目录联接</span>
+                            <span>{t("目录联接", "Symlink")}</span>
                           </span>
                         )}
                       </div>
                       <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
-                        {s.description || "暂无 description 描述，点击查看 SKILL.md 详情"}
+                        {s.description ||
+                          t(
+                            "暂无 description 描述，点击查看 SKILL.md 详情",
+                            "No description yet. Click to view SKILL.md",
+                          )}
                       </p>
                     </div>
 
@@ -319,13 +333,13 @@ export function NativeSkillsTab({
                         className="agy-btn px-2.5 py-1 text-[12px]"
                       >
                         <BookOpen className="h-3.5 w-3.5" />
-                        <span>查看介绍</span>
+                        <span>{t("查看介绍", "View")}</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleOpenInNotepad(s.skillMdPath)}
-                        title="用 Windows 记事本打开 SKILL.md"
+                        title={t("用 Windows 记事本打开 SKILL.md", "Open SKILL.md in Notepad")}
                         className="agy-btn px-2 py-1 text-[12px]"
                       >
                         <NotebookPen className="h-3.5 w-3.5" />
@@ -342,8 +356,8 @@ export function NativeSkillsTab({
                               busy: false,
                             })
                           }
-                          aria-label={`删除 Skill ${s.name}`}
-                          title="删除此 Skill"
+                          aria-label={t(`删除 Skill ${s.name}`, `Delete skill ${s.name}`)}
+                          title={t("删除此 Skill", "Delete this skill")}
                           className="agy-btn-danger-ghost px-2 py-1 text-[12px]"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -400,7 +414,7 @@ export function NativeSkillsTab({
                             : "muted"
                       }
                     >
-                      {detailSkill.scopeLabel}
+                      {localizeScopeBadge(detailSkill.scopeLabel, isEn)}
                     </StatusPill>
                   </div>
                   <p className="mt-1 break-all font-mono-code text-[11.5px] text-[var(--text-faint)] select-text">
@@ -414,7 +428,7 @@ export function NativeSkillsTab({
                     setDetailSkill(null);
                     setDetailData(null);
                   }}
-                  aria-label="关闭弹窗"
+                  aria-label={t("关闭弹窗", "Close dialog")}
                   className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                 >
                   <X className="h-4 w-4" />
@@ -424,13 +438,19 @@ export function NativeSkillsTab({
               {/* Action & Meta Bar */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-6 py-2.5">
                 <div className="flex flex-wrap items-center gap-3 text-[11.5px] text-[var(--text-muted)]">
-                  <span>更新于 {formatMtime(detailData?.modifiedAt ?? detailSkill.modifiedAt)}</span>
+                  <span>
+                    {t("更新于", "Updated")} {formatMtime(detailData?.modifiedAt ?? detailSkill.modifiedAt)}
+                  </span>
                   {detailSkill.subdirs.length > 0 && (
-                    <span className="font-mono-code">子目录: {detailSkill.subdirs.join(", ")}</span>
+                    <span className="font-mono-code">
+                      {t("子目录: ", "Subdirs: ")}
+                      {detailSkill.subdirs.join(", ")}
+                    </span>
                   )}
                   {detailSkill.isSymlink && detailSkill.linkTarget && (
                     <span className="font-mono-code text-[var(--warn)] select-text">
-                      联接目标: {detailSkill.linkTarget}
+                      {t("联接目标: ", "Target: ")}
+                      {detailSkill.linkTarget}
                     </span>
                   )}
                 </div>
@@ -442,7 +462,7 @@ export function NativeSkillsTab({
                     className="agy-btn px-2.5 py-1 text-[12px]"
                   >
                     <FolderOpen className="h-3.5 w-3.5" />
-                    <span>打开目录</span>
+                    <span>{t("打开目录", "Open Folder")}</span>
                   </button>
                   <button
                     type="button"
@@ -450,7 +470,7 @@ export function NativeSkillsTab({
                     className="agy-btn px-2.5 py-1 text-[12px]"
                   >
                     <NotebookPen className="h-3.5 w-3.5" />
-                    <span>记事本打开</span>
+                    <span>{t("记事本打开", "Notepad")}</span>
                   </button>
                   {detailSkill.canDelete && (
                     <button
@@ -466,7 +486,7 @@ export function NativeSkillsTab({
                       className="agy-btn-danger-ghost px-2.5 py-1 text-[12px]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>删除</span>
+                      <span>{t("删除", "Delete")}</span>
                     </button>
                   )}
                 </div>
@@ -477,7 +497,7 @@ export function NativeSkillsTab({
                 {(detailData?.description || detailSkill.description) && (
                   <div className="agy-inset mb-4 px-4 py-3 text-[13px] leading-relaxed text-[var(--text-primary)] select-text">
                     <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
-                      触发介绍 (Description)
+                      {t("触发介绍 (Description)", "Description")}
                     </div>
                     {detailData?.description || detailSkill.description}
                   </div>
@@ -485,13 +505,13 @@ export function NativeSkillsTab({
 
                 {detailLoading ? (
                   <div className="py-10 text-center text-[13px] text-[var(--text-muted)]">
-                    正在加载 SKILL.md 内容...
+                    {t("正在加载 SKILL.md 内容...", "Loading SKILL.md...")}
                   </div>
                 ) : detailData?.bodyMarkdown ? (
                   <MarkdownDocView text={detailData.bodyMarkdown} onOpenUrl={onOpenUrl} />
                 ) : (
                   <div className="py-8 text-center text-[13px] text-[var(--text-faint)]">
-                    SKILL.md 正文为空
+                    {t("SKILL.md 正文为空", "SKILL.md body is empty")}
                   </div>
                 )}
               </div>
@@ -503,20 +523,26 @@ export function NativeSkillsTab({
       {/* Delete Skill Confirm */}
       <ConfirmModal
         open={Boolean(deleteTarget)}
-        title="确认删除 Skill"
+        title={t("确认删除 Skill", "Delete Skill")}
         description={
           deleteTarget
             ? deleteTarget.skill.isSymlink
-              ? `确定移除 Skill「${deleteTarget.skill.name}」吗？\n\n联接入口：${deleteTarget.skill.path}\n默认仅移除联接入口，不会删除原目标路径文件；如需一并清理请在下方开启对应开关。`
-              : `确定删除${deleteTarget.skill.scope === "global" ? "全局" : "项目局部"} Skill「${deleteTarget.skill.name}」吗？\n\n路径：${deleteTarget.skill.path}`
+              ? t(
+                  `确定移除 Skill「${deleteTarget.skill.name}」吗？\n\n联接入口：${deleteTarget.skill.path}\n默认仅移除联接入口，不会删除原目标路径文件；如需一并清理请在下方开启对应开关。`,
+                  `Remove skill "${deleteTarget.skill.name}"?\n\nLink path: ${deleteTarget.skill.path}\nBy default only the link is removed without deleting the target folder. Enable the toggle below to delete the target as well.`,
+                )
+              : t(
+                  `确定删除${deleteTarget.skill.scope === "global" ? "全局" : "项目局部"} Skill「${deleteTarget.skill.name}」吗？\n\n路径：${deleteTarget.skill.path}`,
+                  `Delete ${deleteTarget.skill.scope === "global" ? "global" : "project"} skill "${deleteTarget.skill.name}"?\n\nPath: ${deleteTarget.skill.path}`,
+                )
             : ""
         }
-        confirmLabel="确认删除"
+        confirmLabel={t("确认删除", "Delete")}
         tone="danger"
         busy={deleteTarget?.busy ?? false}
         checkboxLabel={
           deleteTarget && (!deleteTarget.skill.isSymlink || deleteTarget.deleteLinkTarget)
-            ? "移入 Windows 回收站（取消勾选将永久删除）"
+            ? t("移入 Windows 回收站（取消勾选将永久删除）", "Move to Windows Recycle Bin (uncheck to delete permanently)")
             : undefined
         }
         checkboxChecked={deleteTarget?.recycleBin ?? true}
@@ -527,10 +553,10 @@ export function NativeSkillsTab({
           deleteTarget?.skill.isSymlink
             ? [
                 {
-                  label: "同时删除原目标路径中的所有相关文件",
+                  label: t("同时删除原目标路径中的所有相关文件", "Also delete files in the target folder"),
                   hint: deleteTarget.skill.linkTarget
-                    ? `原目标目录：${deleteTarget.skill.linkTarget}`
-                    : "将同时删除该软链接/目录联接指向的原目录",
+                    ? t(`原目标目录：${deleteTarget.skill.linkTarget}`, `Target folder: ${deleteTarget.skill.linkTarget}`)
+                    : t("将同时删除该软链接/目录联接指向的原目录", "Deletes the folder referenced by this symlink/junction"),
                   checked: deleteTarget.deleteLinkTarget,
                   tone: "danger",
                   onChange: (checked) =>

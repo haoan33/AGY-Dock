@@ -237,6 +237,7 @@ pub fn save_ui_preferences(
     paths: &ManagerPaths,
     theme: Option<String>,
     minimize_to_tray: Option<bool>,
+    language: Option<String>,
 ) -> Result<UiPreferences, String> {
     let mut cfg = load_config(paths)?;
     if let Some(t) = theme {
@@ -246,6 +247,12 @@ pub fn save_ui_preferences(
     }
     if let Some(m) = minimize_to_tray {
         cfg.ui.minimize_to_tray = m;
+    }
+    if let Some(lang) = language {
+        if let Some(norm) = crate::i18n::normalize_language_pref(&lang) {
+            cfg.ui.language = Some(norm.to_string());
+            crate::i18n::apply_language_pref(cfg.ui.language.as_deref());
+        }
     }
     save_config(paths, &cfg)?;
     Ok(cfg.ui)

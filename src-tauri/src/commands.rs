@@ -22,7 +22,7 @@ use crate::storage::{self, StorageScanSnapshot};
 use crate::storage_inventory::{self, StorageInventory};
 use crate::supervisor;
 use crate::token_usage;
-use crate::tray::{apply_dwm_titlebar_theme, resolve_theme_is_dark};
+use crate::tray::{apply_dwm_titlebar_theme, resolve_theme_is_dark, update_tray_menu};
 use crate::updater;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -389,19 +389,26 @@ pub async fn save_lifecycle_config(
 
 #[tauri::command]
 pub async fn save_ui_preferences(
+    app: AppHandle,
     window: WebviewWindow,
     state: State<'_, AppState>,
     theme: Option<String>,
     minimize_to_tray: Option<bool>,
+    language: Option<String>,
 ) -> Result<UiPreferences, String> {
     let paths = state.paths.clone();
+    let has_lang_change = language.is_some();
     let saved = tokio::task::spawn_blocking(move || {
-        config::save_ui_preferences(&paths, theme, minimize_to_tray)
+        config::save_ui_preferences(&paths, theme, minimize_to_tray, language)
     })
     .await
-    .map_err(|e| format!("保存界面偏好失败: {e}"))??;
+    .map_err(|e| format!("{}: {e}", crate::i18n::tr("保存界面偏好失败", "Failed to save UI preferences")))??;
     let is_dark = resolve_theme_is_dark(&saved.theme);
     apply_dwm_titlebar_theme(&window, is_dark);
+    if has_lang_change {
+        update_tray_menu(&app);
+        emit_overview_bg(&app, &state.paths).await;
+    }
     Ok(saved)
 }
 
@@ -597,8 +604,9 @@ pub async fn get_storage_inventory(
 
 #[tauri::command]
 pub async fn pick_storage_project(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
-    let path = tokio::task::spawn_blocking(|| {
-        rfd::FileDialog::new().set_title("添加项目文件夹").pick_folder()
+    let title = crate::i18n::tr("添加项目文件夹", "Add Project Folder").to_string();
+    let path = tokio::task::spawn_blocking(move || {
+        rfd::FileDialog::new().set_title(&title).pick_folder()
     })
     .await
     .map_err(|err| format!("打开文件夹选择对话框失败：{err}"))?;
@@ -697,6 +705,11 @@ async fn project_snapshot(
 #[tauri::command]
 pub async fn get_system_dark_mode() -> Result<bool, String> {
     Ok(detector::get_system_dark_mode())
+}
+
+#[tauri::command]
+pub async fn get_system_language() -> Result<String, String> {
+    Ok(crate::i18n::detect_system_language().to_string())
 }
 
 async fn storage_snapshot(
@@ -1212,8 +1225,9 @@ pub async fn create_rule_file_and_open_notepad(
 
 #[tauri::command]
 pub async fn pick_native_project(state: State<'_, AppState>) -> Result<bool, String> {
-    let path = tokio::task::spawn_blocking(|| {
-        rfd::FileDialog::new().set_title("添加项目文件夹").pick_folder()
+    let title = crate::i18n::tr("添加项目文件夹", "Add Project Folder").to_string();
+    let path = tokio::task::spawn_blocking(move || {
+        rfd::FileDialog::new().set_title(&title).pick_folder()
     })
     .await
     .map_err(|err| format!("打开文件夹选择对话框失败：{err}"))?;

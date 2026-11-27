@@ -1,3 +1,5 @@
+import { tr } from "./i18n";
+
 export const SUPPORTED_PACKAGE_EXTS = [".zip", ".agypkg", ".agy-plugin"] as const;
 
 export function formatBytes(size: number | null | undefined): string {
@@ -17,7 +19,7 @@ export function formatBytes(size: number | null | undefined): string {
 
 export function formatVersionText(version: string | null | undefined): string {
   const raw = String(version ?? "").trim();
-  if (!raw) return "未标注";
+  if (!raw) return tr("未标注", "Unspecified");
   return raw.toLowerCase().startsWith("v") ? raw : `v${raw}`;
 }
 
@@ -86,16 +88,17 @@ export function sanitizePlainText(raw: string | null | undefined): string {
 }
 
 export function formatErrorMessage(err: unknown): string {
+  const fallback = tr("未知错误", "Unknown error");
   if (err instanceof Error) {
-    return err.message.split(/\r?\n/)[0] || "未知错误";
+    return err.message.split(/\r?\n/)[0] || fallback;
   }
   if (typeof err === "string") {
-    return err.split(/\r?\n/)[0] || "未知错误";
+    return err.split(/\r?\n/)[0] || fallback;
   }
   if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message?: unknown }).message ?? "未知错误").split(/\r?\n/)[0];
+    return String((err as { message?: unknown }).message ?? fallback).split(/\r?\n/)[0];
   }
-  return "未知错误";
+  return fallback;
 }
 
 export function basename(filePath: string): string {
@@ -151,12 +154,12 @@ export function formatIdleAge(
   nowTs?: number,
 ): { label: string; tone: "ok" | "muted" | "warn" | "danger" } {
   const days = idleAgeDays(mtime, nowTs);
-  if (days === null) return { label: "未知时间", tone: "muted" };
-  if (days === 0) return { label: "今天更新", tone: "ok" };
-  if (days === 1) return { label: "昨天更新", tone: "muted" };
-  if (days < 7) return { label: `${days} 天前`, tone: "muted" };
-  if (days < 30) return { label: `${days} 天未用`, tone: "warn" };
-  return { label: `${days} 天未用 · 闲置`, tone: "danger" };
+  if (days === null) return { label: tr("未知时间", "Unknown"), tone: "muted" };
+  if (days === 0) return { label: tr("今天更新", "Updated today"), tone: "ok" };
+  if (days === 1) return { label: tr("昨天更新", "Yesterday"), tone: "muted" };
+  if (days < 7) return { label: tr(`${days} 天前`, `${days}d ago`), tone: "muted" };
+  if (days < 30) return { label: tr(`${days} 天未用`, `Idle ${days}d`), tone: "warn" };
+  return { label: tr(`${days} 天未用 · 闲置`, `Idle ${days}d · Stale`), tone: "danger" };
 }
 
 export const DEFAULT_NO_PROXY_LIST = "127.0.0.1,localhost,::1";

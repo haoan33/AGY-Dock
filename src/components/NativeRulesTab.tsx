@@ -11,6 +11,7 @@ import {
 import { MarkdownDocView } from "./MarkdownDocView";
 import { SearchInput, SegmentedControl, StatusPill } from "./MotionPrimitives";
 import { formatBytes, formatErrorMessage, formatMtime } from "../lib/format";
+import { localizeScopeBadge, useI18n } from "../lib/i18n";
 import { ipc } from "../lib/ipc";
 import type {
   DiscoveredProject,
@@ -39,6 +40,7 @@ export function NativeRulesTab({
   onOpenUrl,
   onToast,
 }: NativeRulesTabProps) {
+  const { isEn, t } = useI18n();
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState<ProjectFilterMode>("with-rules");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("rendered");
@@ -75,13 +77,13 @@ export function NativeRulesTab({
         setContentData(res);
       } catch (err) {
         if (!silent) {
-          onToast(`读取规则文件失败：${formatErrorMessage(err)}`, "error");
+          onToast(t(`读取规则文件失败：${formatErrorMessage(err)}`, `Failed to read rule file: ${formatErrorMessage(err)}`), "error");
         }
       } finally {
         if (!silent) setContentLoading(false);
       }
     },
-    [onToast],
+    [onToast, t],
   );
 
   useEffect(() => {
@@ -105,19 +107,18 @@ export function NativeRulesTab({
 
   const filteredProjects = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return projects
-      .filter((p) => {
-        if (!p.exists && p.ruleFiles.length === 0) return false;
-        if (projectFilter === "with-rules" && p.ruleFiles.length === 0) return false;
-        if (q) {
-          const projMatch = `${p.name} ${p.rootPath}`.toLowerCase().includes(q);
-          const fileMatch = p.ruleFiles.some((r) =>
-            `${r.fileName} ${r.relPath}`.toLowerCase().includes(q),
-          );
-          if (!projMatch && !fileMatch) return false;
-        }
-        return true;
-      });
+    return projects.filter((p) => {
+      if (!p.exists && p.ruleFiles.length === 0) return false;
+      if (projectFilter === "with-rules" && p.ruleFiles.length === 0) return false;
+      if (q) {
+        const projMatch = `${p.name} ${p.rootPath}`.toLowerCase().includes(q);
+        const fileMatch = p.ruleFiles.some((r) =>
+          `${r.fileName} ${r.relPath}`.toLowerCase().includes(q),
+        );
+        if (!projMatch && !fileMatch) return false;
+      }
+      return true;
+    });
   }, [projects, projectFilter, query]);
 
   const withRulesCount = useMemo(
@@ -133,7 +134,7 @@ export function NativeRulesTab({
     try {
       await ipc.openInNotepad(filePath);
     } catch (err) {
-      onToast(`启动 Windows 记事本失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`启动 Windows 记事本失败：${formatErrorMessage(err)}`, `Failed to open Notepad: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -143,7 +144,7 @@ export function NativeRulesTab({
       setSelectedRuleId(created.id);
       onRefresh();
     } catch (err) {
-      onToast(`创建 ${fileName} 失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`创建 ${fileName} 失败：${formatErrorMessage(err)}`, `Failed to create ${fileName}: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -151,13 +152,13 @@ export function NativeRulesTab({
     try {
       await ipc.openPathInExplorer(path);
     } catch (err) {
-      onToast(`打开目录失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开目录失败：${formatErrorMessage(err)}`, `Failed to open folder: ${formatErrorMessage(err)}`), "error");
     }
   };
 
   const filterOptions: Array<{ key: ProjectFilterMode; label: string; count: number }> = [
-    { key: "with-rules", label: "含规则文件", count: withRulesCount },
-    { key: "all", label: "全部项目", count: existingProjectsCount },
+    { key: "with-rules", label: t("含规则文件", "With Rules"), count: withRulesCount },
+    { key: "all", label: t("全部项目", "All Projects"), count: existingProjectsCount },
   ];
 
   return (
@@ -168,7 +169,7 @@ export function NativeRulesTab({
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="搜索项目名称或 AGENTS.md / GEMINI.md..."
+            placeholder={t("搜索项目名称或 AGENTS.md / GEMINI.md...", "Search projects or AGENTS.md / GEMINI.md...")}
             className="w-[245px]"
           />
           <SegmentedControl
@@ -176,7 +177,7 @@ export function NativeRulesTab({
             value={projectFilter}
             onChange={setProjectFilter}
             layoutId="native-rules-filter"
-            ariaLabel="筛选项目"
+            ariaLabel={t("筛选项目", "Filter projects")}
           />
         </div>
 
@@ -185,10 +186,10 @@ export function NativeRulesTab({
             type="button"
             onClick={onPickProject}
             className="agy-btn px-2.5 py-1.5 text-[12px]"
-            title="添加本地项目文件夹以扫描 AGENTS.md / GEMINI.md"
+            title={t("添加本地项目文件夹以扫描 AGENTS.md / GEMINI.md", "Add a local project folder to scan AGENTS.md / GEMINI.md")}
           >
             <FolderPlus className="h-3.5 w-3.5" />
-            <span>添加项目</span>
+            <span>{t("添加项目", "Add Project")}</span>
           </button>
           <button
             type="button"
@@ -200,7 +201,7 @@ export function NativeRulesTab({
             className="agy-btn px-2.5 py-1.5 text-[12px]"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>刷新</span>
+            <span>{t("刷新", "Refresh")}</span>
           </button>
         </div>
       </div>
@@ -212,7 +213,9 @@ export function NativeRulesTab({
           <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5">
             {filteredProjects.length === 0 ? (
               <div className="flex h-full min-h-[180px] items-center justify-center px-4 text-center text-[12.5px] text-[var(--text-muted)]">
-                {allRules.length > 0 ? "未找到匹配的项目或规则文件" : "暂未发现 AGENTS.md 或 GEMINI.md"}
+                {allRules.length > 0
+                  ? t("未找到匹配的项目或规则文件", "No matching projects or rule files")
+                  : t("暂未发现 AGENTS.md 或 GEMINI.md", "No AGENTS.md or GEMINI.md files found")}
               </div>
             ) : (
               filteredProjects.map((proj) => {
@@ -232,10 +235,10 @@ export function NativeRulesTab({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-[12.5px] font-semibold text-[var(--text-primary)]">
-                            {proj.name}
+                            {localizeScopeBadge(proj.name, isEn)}
                           </span>
                           {proj.source === "global" && (
-                            <StatusPill tone="ok">全局</StatusPill>
+                            <StatusPill tone="ok">{t("全局", "Global")}</StatusPill>
                           )}
                         </div>
                         <p className="mt-0.5 truncate font-mono-code text-[10.5px] text-[var(--text-faint)]">
@@ -245,7 +248,7 @@ export function NativeRulesTab({
                       <button
                         type="button"
                         onClick={() => handleOpenExplorer(proj.rootPath)}
-                        title="在资源管理器中打开项目目录"
+                        title={t("在资源管理器中打开项目目录", "Open project folder in Explorer")}
                         className="shrink-0 cursor-pointer rounded-md p-1 text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                       >
                         <FolderOpen className="h-3.5 w-3.5" />
@@ -281,7 +284,10 @@ export function NativeRulesTab({
                               <div className="flex shrink-0 items-center gap-1.5">
                                 {rf.overLimit && (
                                   <span
-                                    title="超过 Antigravity 单文件 24 KB 规则上下文限制，超出部分会被截断"
+                                    title={t(
+                                      "超过 Antigravity 单文件 24 KB 规则上下文限制，超出部分会被截断",
+                                      "Exceeds Antigravity's 24 KB per-file rule limit; overflow may be truncated",
+                                    )}
                                     className="rounded bg-[var(--warn-bg)] px-1 py-[1px] text-[10px] font-semibold text-[var(--warn)]"
                                   >
                                     &gt;24KB
@@ -306,7 +312,7 @@ export function NativeRulesTab({
                             className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
                           >
                             <FilePlus2 className="h-3 w-3" />
-                            <span>新建 AGENTS.md</span>
+                            <span>{t("新建 AGENTS.md", "New AGENTS.md")}</span>
                           </button>
                         )}
                         {!hasRootGemini && (
@@ -316,7 +322,7 @@ export function NativeRulesTab({
                             className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[var(--info)] hover:text-[var(--text-primary)]"
                           >
                             <FilePlus2 className="h-3 w-3" />
-                            <span>新建 GEMINI.md</span>
+                            <span>{t("新建 GEMINI.md", "New GEMINI.md")}</span>
                           </button>
                         )}
                       </div>
@@ -333,7 +339,12 @@ export function NativeRulesTab({
           {!selectedRule ? (
             <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2 px-6 text-center text-[13px] text-[var(--text-muted)]">
               <FileText className="h-8 w-8 text-[var(--text-faint)]" />
-              <p>从左侧选择任意 `AGENTS.md` 或 `GEMINI.md` 进行预览，或点击「用记事本编辑」</p>
+              <p>
+                {t(
+                  "从左侧选择任意 `AGENTS.md` 或 `GEMINI.md` 进行预览，或点击「用记事本编辑」",
+                  "Select an AGENTS.md or GEMINI.md file on the left to preview or edit in Notepad",
+                )}
+              </p>
             </div>
           ) : (
             <>
@@ -344,12 +355,12 @@ export function NativeRulesTab({
                       {selectedRule.relPath}
                     </h3>
                     <StatusPill tone={selectedRule.scope === "global" ? "ok" : "info"}>
-                      {selectedRule.projectName}
+                      {localizeScopeBadge(selectedRule.projectName, isEn)}
                     </StatusPill>
                   </div>
                   <p className="mt-0.5 truncate font-mono-code text-[11px] text-[var(--text-faint)] select-text">
-                    {selectedRule.fullPath} · {formatBytes(contentData?.sizeBytes ?? selectedRule.sizeBytes)} · 更新于{" "}
-                    {formatMtime(contentData?.modifiedAt ?? selectedRule.modifiedAt)}
+                    {selectedRule.fullPath} · {formatBytes(contentData?.sizeBytes ?? selectedRule.sizeBytes)} ·{" "}
+                    {t("更新于", "Updated")} {formatMtime(contentData?.modifiedAt ?? selectedRule.modifiedAt)}
                   </p>
                 </div>
 
@@ -357,32 +368,35 @@ export function NativeRulesTab({
                   <SegmentedControl
                     options={[
                       { key: "rendered", label: "Markdown" },
-                      { key: "raw", label: "原文" },
+                      { key: "raw", label: t("原文", "Raw") },
                     ]}
                     value={previewMode}
                     onChange={setPreviewMode}
                     layoutId="rule-preview-mode"
-                    ariaLabel="预览模式"
+                    ariaLabel={t("预览模式", "Preview mode")}
                   />
 
                   <button
                     type="button"
                     onClick={() => handleOpenExplorer(selectedRule.fullPath)}
                     className="agy-btn px-2.5 py-1.5 text-[12px]"
-                    title="在资源管理器中定位文件"
+                    title={t("在资源管理器中定位文件", "Reveal in Explorer")}
                   >
                     <FolderOpen className="h-3.5 w-3.5" />
-                    <span>定位</span>
+                    <span>{t("定位", "Locate")}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleOpenInNotepad(selectedRule.fullPath)}
                     className="agy-btn-primary px-3.5 py-1.5 text-[12.5px]"
-                    title="直接使用 Windows 记事本打开编辑（保存后切回本窗口自动刷新）"
+                    title={t(
+                      "直接使用 Windows 记事本打开编辑（保存后切回本窗口自动刷新）",
+                      "Edit in Windows Notepad (auto-reloads when you return to this window)",
+                    )}
                   >
                     <NotebookPen className="h-3.5 w-3.5" />
-                    <span>用记事本编辑</span>
+                    <span>{t("用记事本编辑", "Edit in Notepad")}</span>
                   </button>
                 </div>
               </div>
@@ -391,7 +405,10 @@ export function NativeRulesTab({
                 <div className="flex items-center gap-2 border-b border-[var(--border-hairline)] bg-[var(--warn-bg)] px-5 py-2 text-[12px] text-[var(--warn)]">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>
-                    文件体积超过 Antigravity 单规则 24 KB（24,000 字节）上限，超出部分在对话注入时可能被按行截断。
+                    {t(
+                      "文件体积超过 Antigravity 单规则 24 KB（24,000 字节）上限，超出部分在对话注入时可能被按行截断。",
+                      "File exceeds Antigravity's 24 KB (24,000-byte) per-rule limit; trailing lines may be truncated during injection.",
+                    )}
                   </span>
                 </div>
               )}
@@ -399,11 +416,14 @@ export function NativeRulesTab({
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                 {contentLoading ? (
                   <div className="py-10 text-center text-[13px] text-[var(--text-muted)]">
-                    正在读取文件内容...
+                    {t("正在读取文件内容...", "Loading file contents...")}
                   </div>
                 ) : !contentData || contentData.content.trim().length === 0 ? (
                   <div className="py-10 text-center text-[13px] text-[var(--text-faint)]">
-                    当前文件为空，可点击右上角「用记事本编辑」添加规则内容。
+                    {t(
+                      "当前文件为空，可点击右上角「用记事本编辑」添加规则内容。",
+                      "This file is empty. Click Edit in Notepad above to add rules.",
+                    )}
                   </div>
                 ) : previewMode === "rendered" ? (
                   <MarkdownDocView text={contentData.content} onOpenUrl={onOpenUrl} />

@@ -1,4 +1,6 @@
 export type ThemeMode = "auto" | "light" | "dark";
+export type LanguageMode = "auto" | "zh-CN" | "en";
+export type ResolvedLanguage = "zh-CN" | "en";
 export type PluginType =
   | "node-cdp"
   | "exe-cdp"
@@ -26,6 +28,7 @@ export interface LifecycleConfig {
 export interface UiPreferences {
   theme: ThemeMode;
   minimizeToTray: boolean;
+  language?: LanguageMode;
   shortcutsInitialized?: boolean;
   autoCreateShortcutsOnStartup?: boolean;
 }
@@ -777,6 +780,7 @@ export const TAURI_COMMANDS = {
   OPEN_PATH_IN_EXPLORER: "open_path_in_explorer",
   PICK_FILE: "pick_file",
   GET_SYSTEM_DARK_MODE: "get_system_dark_mode",
+  GET_SYSTEM_LANGUAGE: "get_system_language",
   GET_STORAGE_INVENTORY: "get_storage_inventory",
   PICK_STORAGE_PROJECT: "pick_storage_project",
   REMOVE_STORAGE_PROJECT: "remove_storage_project",

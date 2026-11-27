@@ -23,6 +23,7 @@ import {
   formatVersionText,
   isSupportedPackagePath,
 } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import type {
   PluginRuntimeStatus,
   RemoteMarketplaceResult,
@@ -60,6 +61,7 @@ export function MyPluginsPage({
   onDropPackagePaths,
   onOpenMarketplace,
 }: MyPluginsPageProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [htmlDragOver, setHtmlDragOver] = useState(false);
@@ -122,9 +124,9 @@ export function MyPluginsPage({
   );
 
   const filterChips: Array<{ key: FilterKey; label: string; count: number }> = [
-    { key: "all", label: "全部", count: plugins.length },
-    { key: "running", label: "运行中", count: runningCount },
-    { key: "idle", label: "待命", count: plugins.length - runningCount },
+    { key: "all", label: t("全部", "All"), count: plugins.length },
+    { key: "running", label: t("运行中", "Running"), count: runningCount },
+    { key: "idle", label: t("待命", "Idle"), count: plugins.length - runningCount },
   ];
 
   return (
@@ -135,7 +137,7 @@ export function MyPluginsPage({
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="搜索插件名称、简介或 ID..."
+            placeholder={t("搜索插件名称、简介或 ID...", "Search plugin name, description, or ID...")}
             className="w-[230px]"
           />
 
@@ -144,22 +146,22 @@ export function MyPluginsPage({
             value={filter}
             onChange={setFilter}
             layoutId="my-plugins-filter"
-            ariaLabel="筛选插件状态"
+            ariaLabel={t("筛选插件状态", "Filter plugin status")}
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={onOpenCreateModal} className="agy-btn">
             <Plus className="h-3.5 w-3.5" />
-            <span>导入插件</span>
+            <span>{t("导入插件", "Import")}</span>
           </button>
           <button type="button" onClick={onPickPackageFile} className="agy-btn">
             <PackagePlus className="h-3.5 w-3.5" />
-            <span>安装插件包</span>
+            <span>{t("安装插件包", "Install Package")}</span>
           </button>
           <button type="button" onClick={onOpenMarketplace} className="agy-btn-primary">
             <Store className="h-3.5 w-3.5" />
-            <span>浏览市场</span>
+            <span>{t("浏览市场", "Marketplace")}</span>
           </button>
         </div>
       </div>
@@ -192,8 +194,11 @@ export function MyPluginsPage({
               >
                 <p className="text-[13.5px] text-[var(--text-muted)]">
                   {plugins.length > 0
-                    ? "未找到匹配的扩展"
-                    : "暂无已安装扩展，可点击「+ 导入插件」或拖入插件包"}
+                    ? t("未找到匹配的扩展", "No matching plugins found")
+                    : t(
+                        "暂无已安装扩展，可点击「+ 导入插件」或拖入插件包",
+                        "No plugins installed yet. Click Import or drag & drop a package file.",
+                      )}
                 </p>
               </motion.div>
             ) : (
@@ -214,7 +219,7 @@ export function MyPluginsPage({
                     const remoteUpdate = remoteUpdatesById[p.id.toLowerCase()];
 
                     let statusTone: "ok" | "muted" | "warn" = "muted";
-                    let statusText = "○ 待命";
+                    let statusText = t("○ 待命", "○ Idle");
                     if (p.running) {
                       statusTone = "ok";
                       if (mem > 0) {
@@ -222,11 +227,13 @@ export function MyPluginsPage({
                           ? `${pids[0]} · ${formatBytes(mem)}`
                           : formatBytes(mem);
                       } else {
-                        statusText = pids[0] ? `运行 ${pids[0]}` : "运行中";
+                        statusText = pids[0]
+                          ? t(`运行 ${pids[0]}`, `PID ${pids[0]}`)
+                          : t("运行中", "Running");
                       }
                     } else if (!enabled) {
                       statusTone = "warn";
-                      statusText = "已禁用";
+                      statusText = t("已禁用", "Disabled");
                     }
 
                     return (
@@ -258,11 +265,11 @@ export function MyPluginsPage({
                             </span>
                             {p.hasSettings && (
                               <span
-                                title="此插件提供自定义设置页"
+                                title={t("此插件提供自定义设置页", "This plugin provides a custom settings page")}
                                 className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-1.5 py-[1px] text-[11px] font-medium whitespace-nowrap text-[var(--text-muted)]"
                               >
                                 <SlidersHorizontal className="h-2.5 w-2.5 text-[var(--accent)]" />
-                                <span>可设置</span>
+                                <span>{t("可设置", "Settings")}</span>
                               </span>
                             )}
                             {p.author?.trim() && (
@@ -280,16 +287,19 @@ export function MyPluginsPage({
                                   e.stopPropagation();
                                   onOpenDetail(p.id);
                                 }}
-                                title={`查看 ${formatVersionText(remoteUpdate.version)} 的更新日志`}
+                                title={t(
+                                  `查看 ${formatVersionText(remoteUpdate.version)} 的更新日志`,
+                                  `View changelog for ${formatVersionText(remoteUpdate.version)}`,
+                                )}
                                 className="shrink-0 cursor-pointer rounded-[10px] px-2 py-[1.5px] text-[11px] font-semibold whitespace-nowrap transition-opacity hover:opacity-85"
                                 style={{ backgroundColor: "var(--warn-bg)", color: "var(--warn)" }}
                               >
-                                有更新 {formatVersionText(remoteUpdate.version)}
+                                {t("有更新", "Update")} {formatVersionText(remoteUpdate.version)}
                               </button>
                             )}
                           </div>
                           <p className="mt-0.5 truncate text-[12.5px] text-[var(--text-muted)]">
-                            {p.description || "外部扩展"}
+                            {p.description || t("外部扩展", "External Plugin")}
                           </p>
                         </div>
 
@@ -313,7 +323,7 @@ export function MyPluginsPage({
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => onPluginAction(p.id, "restart")}
-                                title="重启插件"
+                                title={t("重启插件", "Restart plugin")}
                                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border-hairline)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-40"
                               >
                                 <RotateCw className={`h-3.5 w-3.5 ${isBusy ? "animate-spin" : ""}`} />
@@ -322,7 +332,7 @@ export function MyPluginsPage({
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => onPluginAction(p.id, "stop")}
-                                title="停止插件"
+                                title={t("停止插件", "Stop plugin")}
                                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border-hairline)] hover:bg-[var(--bg-surface)] hover:text-[var(--danger)] disabled:opacity-40"
                               >
                                 <Square className="h-3.5 w-3.5" />
@@ -333,7 +343,7 @@ export function MyPluginsPage({
                               type="button"
                               disabled={isBusy || !enabled}
                               onClick={() => onPluginAction(p.id, "start")}
-                              title={enabled ? "启动并附着" : "请先启用插件"}
+                              title={enabled ? t("启动并附着", "Start and attach") : t("请先启用插件", "Enable plugin first")}
                               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border-hairline)] hover:bg-[var(--bg-surface)] hover:text-[var(--ok)] disabled:opacity-35"
                             >
                               <Play className="h-3.5 w-3.5" />
@@ -345,7 +355,7 @@ export function MyPluginsPage({
                           <SpringSwitch
                             checked={enabled}
                             disabled={isBusy}
-                            ariaLabel={`切换启用 ${p.name || p.id}`}
+                            ariaLabel={t(`切换启用 ${p.name || p.id}`, `Toggle ${p.name || p.id}`)}
                             onChange={(next) => onTogglePlugin(p.id, next)}
                           />
                         </div>
@@ -358,7 +368,7 @@ export function MyPluginsPage({
                           }}
                           className="agy-btn shrink-0 px-3 py-1.5 text-[12.5px]"
                         >
-                          管理
+                          {t("管理", "Manage")}
                         </button>
                       </motion.div>
                     );
@@ -382,8 +392,14 @@ export function MyPluginsPage({
             <Upload className="h-3.5 w-3.5 shrink-0" />
             <span>
               {dragActive
-                ? "松开鼠标立即安装插件包 (.zip / .agypkg / .agy-plugin)"
-                : "拖入插件安装包 (.zip / .agypkg / .agy-plugin) 自动安装，或点击选择文件"}
+                ? t(
+                    "松开鼠标立即安装插件包 (.zip / .agypkg / .agy-plugin)",
+                    "Drop to install plugin package (.zip / .agypkg / .agy-plugin)",
+                  )
+                : t(
+                    "拖入插件安装包 (.zip / .agypkg / .agy-plugin) 自动安装，或点击选择文件",
+                    "Drag & drop a plugin package (.zip / .agypkg / .agy-plugin) here, or click to select",
+                  )}
             </span>
           </div>
         </div>

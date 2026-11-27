@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { parseArgsText, validatePluginId } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import type { PluginPayload, PluginType } from "../types/ipc";
 
 export interface PluginEditorInitial {
@@ -25,6 +26,7 @@ export function PluginEditorModal({
   onClose,
   onSubmit,
 }: PluginEditorModalProps) {
+  const { t } = useI18n();
   const mode = initial?.mode ?? "create";
   const plugin = initial?.plugin ?? null;
 
@@ -77,11 +79,16 @@ export function PluginEditorModal({
     const cleanId = id.trim();
     const cleanCmd = command.trim();
     if (!validatePluginId(cleanId)) {
-      setValidationError("插件 ID 仅支持字母、数字、点号、连字符和下划线（2–64 位，不能以点号结尾或含 ..）。");
+      setValidationError(
+        t(
+          "插件 ID 仅支持字母、数字、点号、连字符和下划线（2–64 位，不能以点号结尾或含 ..）。",
+          "Plugin ID may only contain letters, digits, dots, hyphens, and underscores (2-64 chars; cannot end with '.' or contain '..').",
+        ),
+      );
       return;
     }
     if (!cleanCmd) {
-      setValidationError("启动命令不能为空。");
+      setValidationError(t("启动命令不能为空。", "Launch command cannot be empty."));
       return;
     }
     setValidationError("");
@@ -129,14 +136,16 @@ export function PluginEditorModal({
             {/* Header */}
             <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-6 py-4">
               <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
-                {mode === "edit" ? `配置 · ${plugin?.name || plugin?.id}` : "导入外部插件"}
+                {mode === "edit"
+                  ? t(`配置 · ${plugin?.name || plugin?.id}`, `Configure · ${plugin?.name || plugin?.id}`)
+                  : t("导入外部插件", "Import External Plugin")}
               </h2>
               <button
                 type="button"
                 disabled={saving}
                 onClick={onClose}
                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                aria-label="关闭弹窗"
+                aria-label={t("关闭弹窗", "Close dialog")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -145,130 +154,130 @@ export function PluginEditorModal({
             {/* Form Body */}
             <form onSubmit={handleSubmit} className="max-h-[78vh] overflow-y-auto px-6 py-5">
               <div className="space-y-3">
-                <FormRow label="插件 ID *">
+                <FormRow label={t("插件 ID *", "Plugin ID *")}>
                   <input
                     type="text"
                     value={id}
                     onChange={(e) => setId(e.target.value)}
                     readOnly={mode === "edit"}
-                    placeholder="zhangsan.my-plugin"
+                    placeholder="author.my-plugin"
                     className="agy-input w-full font-mono-code"
                     autoFocus={mode === "create"}
                   />
                 </FormRow>
 
-                <FormRow label="显示名称 *">
+                <FormRow label={t("显示名称 *", "Name *")}>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="插件名称"
+                    placeholder={t("插件名称", "Plugin display name")}
                     className="agy-input w-full"
                     autoFocus={mode === "edit"}
                   />
                 </FormRow>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <FormRow label="版本号" compact>
+                  <FormRow label={t("版本号", "Version")} compact>
                     <input
                       type="text"
                       value={version}
                       onChange={(e) => setVersion(e.target.value)}
-                      placeholder="可选，如 1.0.1"
+                      placeholder={t("可选，如 1.0.1", "Optional, e.g. 1.0.1")}
                       className="agy-input w-full font-mono-code"
                     />
                   </FormRow>
-                  <FormRow label="作者" compact>
+                  <FormRow label={t("作者", "Author")} compact>
                     <input
                       type="text"
                       value={author}
                       onChange={(e) => setAuthor(e.target.value)}
-                      placeholder="可选，如 HaoAn"
+                      placeholder={t("可选，如 HaoAn", "Optional, e.g. HaoAn")}
                       className="agy-input w-full"
                     />
                   </FormRow>
-                  <FormRow label="运行类型" compact>
+                  <FormRow label={t("运行类型", "Runtime Type")} compact>
                     <select
                       value={type}
                       onChange={(e) => setType(e.target.value)}
                       className="agy-input w-full cursor-pointer"
                     >
-                      <option value="node-cdp">CDP 注入 · Node (node-cdp)</option>
-                      <option value="custom-cdp">CDP 注入 · 自定义 (custom-cdp)</option>
-                      <option value="node-companion">后台伴随 · Node (node-companion)</option>
-                      <option value="ps-companion">后台伴随 · PowerShell (ps-companion)</option>
-                      <option value="py-companion">后台伴随 · Python (py-companion)</option>
-                      <option value="exe-cdp">旧版可执行 (exe-cdp)</option>
+                      <option value="node-cdp">{t("CDP 注入 · Node (node-cdp)", "CDP · Node (node-cdp)")}</option>
+                      <option value="custom-cdp">{t("CDP 注入 · 自定义 (custom-cdp)", "CDP · Custom (custom-cdp)")}</option>
+                      <option value="node-companion">{t("后台伴随 · Node (node-companion)", "Companion · Node (node-companion)")}</option>
+                      <option value="ps-companion">{t("后台伴随 · PowerShell (ps-companion)", "Companion · PowerShell (ps-companion)")}</option>
+                      <option value="py-companion">{t("后台伴随 · Python (py-companion)", "Companion · Python (py-companion)")}</option>
+                      <option value="exe-cdp">{t("旧版可执行 (exe-cdp)", "Legacy Executable (exe-cdp)")}</option>
                     </select>
                   </FormRow>
                 </div>
 
-                <FormRow label="简介">
+                <FormRow label={t("简介", "Description")}>
                   <input
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="一句话功能描述"
+                    placeholder={t("一句话功能描述", "Short description")}
                     className="agy-input w-full"
                   />
                 </FormRow>
 
-                <FormRow label="启动命令 *">
+                <FormRow label={t("启动命令 *", "Command *")}>
                   <input
                     type="text"
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
-                    placeholder="node 或 plugins\demo\index.exe"
+                    placeholder={t("node 或 plugins\\demo\\index.exe", "node or plugins\\demo\\index.js")}
                     className="agy-input w-full font-mono-code"
                   />
                 </FormRow>
 
-                <FormRow label="启动参数" alignTop>
+                <FormRow label={t("启动参数", "Launch Args")} alignTop>
                   <textarea
                     rows={2}
                     value={launchArgsText}
                     onChange={(e) => setLaunchArgsText(e.target.value)}
-                    placeholder="支持 {CDP_PORT} / {BASE_DIR} / {AGY_PID}（换行或空格分隔）"
+                    placeholder={t("支持 {CDP_PORT} / {BASE_DIR} / {AGY_PID}（换行或空格分隔）", "Supports {CDP_PORT} / {BASE_DIR} / {AGY_PID} (one per line or space-separated)")}
                     className="agy-input w-full resize-none font-mono-code text-[12px]"
                   />
                 </FormRow>
 
-                <FormRow label="附着参数" alignTop>
+                <FormRow label={t("附着参数", "Attach Args")} alignTop>
                   <textarea
                     rows={2}
                     value={attachArgsText}
                     onChange={(e) => setAttachArgsText(e.target.value)}
-                    placeholder="留空则复用启动参数"
+                    placeholder={t("留空则复用启动参数", "Leave blank to reuse launch args")}
                     className="agy-input w-full resize-none font-mono-code text-[12px]"
                   />
                 </FormRow>
 
-                <FormRow label="停止参数" alignTop>
+                <FormRow label={t("停止参数", "Stop Args")} alignTop>
                   <textarea
                     rows={2}
                     value={stopArgsText}
                     onChange={(e) => setStopArgsText(e.target.value)}
-                    placeholder="可选，优雅停止时传给命令的参数（如 --stop）"
+                    placeholder={t("可选，优雅停止时传给命令的参数（如 --stop）", "Optional args passed on graceful stop (e.g. --stop)")}
                     className="agy-input w-full resize-none font-mono-code text-[12px]"
                   />
                 </FormRow>
 
-                <FormRow label="健康地址">
+                <FormRow label={t("健康地址", "Health URL")}>
                   <input
                     type="text"
                     value={healthUrl}
                     onChange={(e) => setHealthUrl(e.target.value)}
-                    placeholder="可选，http://127.0.0.1:PORT/health"
+                    placeholder={t("可选，http://127.0.0.1:PORT/health", "Optional, http://127.0.0.1:PORT/health")}
                     className="agy-input w-full font-mono-code"
                   />
                 </FormRow>
 
-                <FormRow label="进程标识">
+                <FormRow label={t("进程标识", "Process Match")}>
                   <input
                     type="text"
                     value={processMatch}
                     onChange={(e) => setProcessMatch(e.target.value)}
-                    placeholder="可选，命令行进程匹配关键字（禁止填 node/python 等通用名）"
+                    placeholder={t("可选，命令行进程匹配关键字（禁止填 node/python 等通用名）", "Optional command-line match substring (never bare node/python)")}
                     className="agy-input w-full font-mono-code"
                   />
                 </FormRow>
@@ -276,12 +285,12 @@ export function PluginEditorModal({
                 <div className="flex flex-wrap items-center gap-6 pt-2">
                   <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--text-primary)]">
                     <SpringSwitch checked={enabled} onChange={setEnabled} />
-                    <span>启用插件</span>
+                    <span>{t("启用插件", "Enable Plugin")}</span>
                   </label>
 
                   <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--text-primary)]">
                     <SpringSwitch checked={autoAttach} onChange={setAutoAttach} />
-                    <span>随主程序自动附着</span>
+                    <span>{t("随主程序自动附着", "Auto-attach with Antigravity")}</span>
                   </label>
                 </div>
 
@@ -302,10 +311,10 @@ export function PluginEditorModal({
                   onClick={onClose}
                   className="agy-btn"
                 >
-                  取消
+                  {t("取消", "Cancel")}
                 </button>
                 <button type="submit" disabled={saving} className="agy-btn-primary">
-                  {saving ? "保存中..." : "保存"}
+                  {saving ? t("保存中...", "Saving...") : t("保存", "Save")}
                 </button>
               </div>
             </form>

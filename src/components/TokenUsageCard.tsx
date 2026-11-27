@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { MOTION_EASE, SegmentedControl } from "./MotionPrimitives";
+import { localizeMonthLabel, localizeWeekday, useI18n } from "../lib/i18n";
 import type { TokenDayUsage, TokenUsageSnapshot } from "../types/ipc";
 
 type UsageRange = "7d" | "30d" | "all";
@@ -17,12 +18,6 @@ interface HoverTipState {
   x: number;
   y: number;
 }
-
-const RANGE_OPTIONS: Array<{ key: UsageRange; label: string }> = [
-  { key: "7d", label: "7 天" },
-  { key: "30d", label: "30 天" },
-  { key: "all", label: "总量" },
-];
 
 export function formatCompactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) return "0";
@@ -69,6 +64,7 @@ const LEVEL_BG: Record<0 | 1 | 2 | 3 | 4, string> = {
 };
 
 export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
+  const { isEn, t } = useI18n();
   const [range, setRange] = useState<UsageRange>("7d");
   const [pinnedDate, setPinnedDate] = useState<string | null>(null);
   const [hoverTip, setHoverTip] = useState<HoverTipState | null>(null);
@@ -77,6 +73,15 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
     width: 0,
     height: 0,
   });
+
+  const rangeOptions = useMemo<Array<{ key: UsageRange; label: string }>>(
+    () => [
+      { key: "7d", label: t("7 天", "7D") },
+      { key: "30d", label: t("30 天", "30D") },
+      { key: "all", label: t("总量", "All") },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     const el = chartBodyRef.current;
@@ -148,11 +153,12 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
     columns.forEach((col, colIdx) => {
       const firstValid = col.find((d): d is TokenDayUsage => d !== null);
       if (!firstValid) return;
-      if (firstValid.monthLabel !== lastMonth) {
+      const mLabel = localizeMonthLabel(firstValid.dateStr, firstValid.monthLabel, isEn);
+      if (mLabel !== lastMonth) {
         if (colIdx === 0 || colIdx - (monthLabels[monthLabels.length - 1]?.colIdx ?? -9) >= 2) {
-          monthLabels.push({ colIdx, label: firstValid.monthLabel });
+          monthLabels.push({ colIdx, label: mLabel });
         }
-        lastMonth = firstValid.monthLabel;
+        lastMonth = mLabel;
       }
     });
 
@@ -163,7 +169,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
       cellSize,
       gap,
     };
-  }, [days, bodySize.width, bodySize.height]);
+  }, [days, bodySize.width, bodySize.height, isEn]);
 
   const thresholds30 = useMemo(() => buildQuartileThresholds(last30), [last30]);
   const row30Height = useMemo(() => {
@@ -173,17 +179,23 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
   const show30CellTokens = row30Height >= 56;
 
   const headerStat = useMemo(() => {
-    if (!data) return { total: "--", sub: "扫描本地对话中..." };
+    if (!data) return { total: "--", sub: t("扫描本地对话中...", "Scanning local conversations...") };
     if (range === "7d") {
       return {
         total: formatCompactTokens(data.days7Total),
-        sub: `日均 ${formatCompactTokens(data.days7AvgActive)} · ${data.days7Sessions} 会话`,
+        sub: t(
+          `日均 ${formatCompactTokens(data.days7AvgActive)} · ${data.days7Sessions} 会话`,
+          `Avg ${formatCompactTokens(data.days7AvgActive)}/d · ${data.days7Sessions} sessions`,
+        ),
       };
     }
     if (range === "30d") {
       return {
         total: formatCompactTokens(data.days30Total),
-        sub: `活跃 ${data.days30ActiveDays}/30天 · ${data.days30Sessions} 会话`,
+        sub: t(
+          `活跃 ${data.days30ActiveDays}/30天 · ${data.days30Sessions} 会话`,
+          `Active ${data.days30ActiveDays}/30d · ${data.days30Sessions} sessions`,
+        ),
       };
     }
     const cachePct =
@@ -192,9 +204,12 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
         : 0;
     return {
       total: formatCompactTokens(data.allTotalTokens),
-      sub: `累计 ${data.allActiveDays} 活跃天 · 缓存 ${cachePct}%`,
+      sub: t(
+        `累计 ${data.allActiveDays} 活跃天 · 缓存 ${cachePct}%`,
+        `${data.allActiveDays} active days · ${cachePct}% cached`,
+      ),
     };
-  }, [data, range]);
+  }, [data, range, t]);
 
   const pinnedDay = useMemo(
     () => (pinnedDate ? days.find((d) => d.dateStr === pinnedDate) ?? null : null),
@@ -242,7 +257,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
         <div className="min-w-0">
           <div className="flex items-baseline gap-2">
             <h2 className="text-[13.5px] font-semibold tracking-tight text-[var(--text-primary)]">
-              Token 用量
+              {t("Token 用量", "Token Usage")}
             </h2>
             <span className="tabular-nums text-[15px] font-semibold text-[var(--sage)]">
               {headerStat.total}
@@ -265,9 +280,9 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
             setHoverTip(null);
             setRange(v);
           }}
-          options={RANGE_OPTIONS}
+          options={rangeOptions}
           layoutId="token-usage-range"
-          ariaLabel="Token 用量范围"
+          ariaLabel={t("Token 用量范围", "Token usage range")}
         />
       </div>
 
@@ -285,7 +300,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
             >
               {last7.length === 0 ? (
                 <div className="flex flex-1 items-center justify-center text-[12px] text-[var(--text-muted)]">
-                  暂无近 7 天对话统计
+                  {t("暂无近 7 天对话统计", "No conversation stats in the last 7 days")}
                 </div>
               ) : (
                 <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -366,7 +381,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
                               : "text-[var(--text-secondary)]"
                           }`}
                         >
-                          {day.isToday ? "今天" : day.weekday.replace("周", "")}
+                          {day.isToday ? t("今天", "Today") : localizeWeekday(day.dow, isEn)}
                         </div>
                         <div className="tabular-nums text-[9.5px] text-[var(--text-faint)]">
                           {day.shortDate}
@@ -444,9 +459,9 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
               </div>
 
               <div className="flex shrink-0 items-center justify-between text-[11px] text-[var(--text-faint)]">
-                <span>近 30 天 · 每格一天</span>
+                <span>{t("近 30 天 · 每格一天", "Last 30 days · 1 cell per day")}</span>
                 <div className="flex items-center gap-1">
-                  <span>少</span>
+                  <span>{t("少", "Less")}</span>
                   {([0, 1, 2, 3, 4] as const).map((lvl) => (
                     <span
                       key={lvl}
@@ -454,7 +469,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
                       style={{ backgroundColor: LEVEL_BG[lvl] }}
                     />
                   ))}
-                  <span>多</span>
+                  <span>{t("多", "More")}</span>
                 </div>
               </div>
             </motion.div>
@@ -508,11 +523,11 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
                       }}
                     >
                       <span />
-                      <span className="self-center">一</span>
+                      <span className="self-center">{t("一", "M")}</span>
                       <span />
-                      <span className="self-center">三</span>
+                      <span className="self-center">{t("三", "W")}</span>
                       <span />
-                      <span className="self-center">五</span>
+                      <span className="self-center">{t("五", "F")}</span>
                       <span />
                     </div>
 
@@ -587,9 +602,9 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
               </div>
 
               <div className="flex shrink-0 items-center justify-between text-[11px] text-[var(--text-faint)]">
-                <span>近 {allMatrix.columns.length} 周轨迹</span>
+                <span>{t(`近 ${allMatrix.columns.length} 周轨迹`, `Last ${allMatrix.columns.length} weeks`)}</span>
                 <div className="flex items-center gap-1">
-                  <span>少</span>
+                  <span>{t("少", "Less")}</span>
                   {([0, 1, 2, 3, 4] as const).map((lvl) => (
                     <span
                       key={lvl}
@@ -597,7 +612,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
                       style={{ backgroundColor: LEVEL_BG[lvl] }}
                     />
                   ))}
-                  <span>多</span>
+                  <span>{t("多", "More")}</span>
                 </div>
               </div>
             </motion.div>
@@ -612,7 +627,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
             <strong>{pinnedDay.shortDate}</strong> · {formatCompactTokens(pinnedDay.totalTokens)}
             <span className="text-[var(--text-muted)]">
               {" "}
-              (缓存 {formatCompactTokens(pinnedDay.cacheRead)} / 输出{" "}
+              ({t("缓存", "Cached")} {formatCompactTokens(pinnedDay.cacheRead)} / {t("输出", "Output")}{" "}
               {formatCompactTokens(pinnedDay.outputTotal)})
             </span>
           </span>
@@ -620,7 +635,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
             type="button"
             onClick={() => setPinnedDate(null)}
             className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            aria-label="取消固定日期"
+            aria-label={t("取消固定日期", "Unpin date")}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -638,7 +653,7 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
           >
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[11.5px] font-semibold text-[var(--text-primary)]">
-                {hoverTip.day.dateStr} ({hoverTip.day.weekday})
+                {hoverTip.day.dateStr} ({localizeWeekday(hoverTip.day.dow, isEn, true)})
               </span>
               <span className="tabular-nums text-[12px] font-semibold text-[var(--sage)]">
                 {formatCompactTokens(hoverTip.day.totalTokens)}
@@ -647,19 +662,19 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
 
             <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-[var(--border-hairline)] pt-1.5 text-[10.5px]">
               <div>
-                <div className="text-[var(--text-faint)]">缓存命中</div>
+                <div className="text-[var(--text-faint)]">{t("缓存命中", "Cache Hit")}</div>
                 <div className="font-medium tabular-nums text-[var(--text-primary)]">
                   {formatCompactTokens(hoverTip.day.cacheRead)}
                 </div>
               </div>
               <div>
-                <div className="text-[var(--text-faint)]">新输入</div>
+                <div className="text-[var(--text-faint)]">{t("新输入", "Input")}</div>
                 <div className="font-medium tabular-nums text-[var(--text-primary)]">
                   {formatCompactTokens(hoverTip.day.uncachedInput)}
                 </div>
               </div>
               <div>
-                <div className="text-[var(--text-faint)]">输出</div>
+                <div className="text-[var(--text-faint)]">{t("输出", "Output")}</div>
                 <div className="font-medium tabular-nums text-[var(--text-primary)]">
                   {formatCompactTokens(hoverTip.day.outputTotal)}
                 </div>
@@ -686,7 +701,9 @@ export function TokenUsageCard({ data, className = "" }: TokenUsageCardProps) {
                     {Math.round((hoverTip.day.argonTokens / hoverTip.day.totalTokens) * 100)}%
                   </span>
                 )}
-                <span className="ml-auto">{hoverTip.day.sessions} 会话</span>
+                <span className="ml-auto">
+                  {t(`${hoverTip.day.sessions} 会话`, `${hoverTip.day.sessions} sessions`)}
+                </span>
               </div>
             )}
           </div>,

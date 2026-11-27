@@ -671,7 +671,7 @@ pub fn get_mcp_overview(paths: &ManagerPaths) -> McpOverview {
         &known_project_paths,
         &global_cfg,
         "global",
-        "全局配置",
+        crate::i18n::tr("全局配置", "Global"),
         None,
         None,
         true,
@@ -687,7 +687,7 @@ pub fn get_mcp_overview(paths: &ManagerPaths) -> McpOverview {
             continue;
         }
         let p_mcp = paths.gemini_plugins_dir.join(&np.dir).join("mcp_config.json");
-        let label = format!("扩展: {}", np.name);
+        let label = format!("{}: {}", crate::i18n::tr("扩展", "Extension"), np.name);
         servers.extend(parse_mcp_servers_from_file(
             paths,
             &known_project_paths,
@@ -712,7 +712,7 @@ pub fn get_mcp_overview(paths: &ManagerPaths) -> McpOverview {
             continue;
         }
         let proj_str = clean_win_display(&proj.root);
-        let label = format!("项目: {}", proj.name);
+        let label = format!("{}: {}", crate::i18n::tr("项目", "Project"), proj.name);
         for rel in PROJECT_MCP_REL_FILES {
             let candidate = proj.root.join(rel);
             if !candidate.is_file() {
@@ -1014,11 +1014,20 @@ pub async fn check_mcp_endpoint(url: &str) -> Result<McpEndpointProbe, String> {
             let code = resp.status().as_u16();
             // For Streamable HTTP MCP endpoints, 200/401/403/405/406 all indicate the server endpoint is alive & reachable
             let reachable = code < 500;
-            let message = match code {
-                200..=299 => format!("端点在线 (HTTP {code})"),
-                401 | 403 => format!("端点在线，需鉴权 (HTTP {code})"),
-                405 | 406 => format!("端点在线，Streamable HTTP 仅响应 POST (HTTP {code})"),
-                _ => format!("服务器返回 HTTP {code}"),
+            let message = if crate::i18n::is_en() {
+                match code {
+                    200..=299 => format!("Endpoint online (HTTP {code})"),
+                    401 | 403 => format!("Endpoint online, auth required (HTTP {code})"),
+                    405 | 406 => format!("Endpoint online, Streamable HTTP accepts POST only (HTTP {code})"),
+                    _ => format!("Server returned HTTP {code}"),
+                }
+            } else {
+                match code {
+                    200..=299 => format!("端点在线 (HTTP {code})"),
+                    401 | 403 => format!("端点在线，需鉴权 (HTTP {code})"),
+                    405 | 406 => format!("端点在线，Streamable HTTP 仅响应 POST (HTTP {code})"),
+                    _ => format!("服务器返回 HTTP {code}"),
+                }
             };
             Ok(McpEndpointProbe {
                 reachable,
@@ -1033,7 +1042,7 @@ pub async fn check_mcp_endpoint(url: &str) -> Result<McpEndpointProbe, String> {
                 reachable: false,
                 status_code: None,
                 latency_ms,
-                message: format!("连接失败: {err}"),
+                message: format!("{}: {err}", crate::i18n::tr("连接失败", "Connection failed")),
             })
         }
     }
@@ -1251,7 +1260,7 @@ pub fn list_skills(paths: &ManagerPaths) -> Vec<SkillInfo> {
     scan_skills_in_root(
         &global_skills_dir(paths),
         "global",
-        "全局",
+        crate::i18n::tr("全局", "Global"),
         None,
         None,
         None,
@@ -1266,7 +1275,7 @@ pub fn list_skills(paths: &ManagerPaths) -> Vec<SkillInfo> {
             continue;
         }
         let proj_str = clean_win_display(&proj.root);
-        let scope_label = format!("项目: {}", proj.name);
+        let scope_label = format!("{}: {}", crate::i18n::tr("项目", "Project"), proj.name);
         for rel in PROJECT_SKILL_REL_DIRS {
             scan_skills_in_root(
                 &proj.root.join(rel),
@@ -1288,7 +1297,7 @@ pub fn list_skills(paths: &ManagerPaths) -> Vec<SkillInfo> {
             continue;
         }
         let p_skills = paths.gemini_plugins_dir.join(&np.dir).join("skills");
-        let scope_label = format!("扩展: {}", np.name);
+        let scope_label = format!("{}: {}", crate::i18n::tr("扩展", "Extension"), np.name);
         scan_skills_in_root(
             &p_skills,
             "plugin",
@@ -1496,11 +1505,25 @@ pub fn list_project_rules(paths: &ManagerPaths) -> ProjectRulesOverview {
     let mut projects = Vec::new();
 
     // Global config rules (~/.gemini/config/AGENTS.md, GEMINI.md)
-    let global_rules = scan_rule_files_in_project(&global_dir, "global", "global", "全局配置 (~/.gemini/config)", 0);
+    let global_name = crate::i18n::tr(
+        "全局配置 (~/.gemini/config)",
+        "Global Config (~/.gemini/config)",
+    );
+    let global_rules = scan_rule_files_in_project(&global_dir, "global", "global", global_name, 0);
     let global_skill_count = {
         let mut s = Vec::new();
         let mut seen = HashSet::new();
-        scan_skills_in_root(&global_skills_dir(paths), "global", "全局", None, None, None, true, &mut seen, &mut s);
+        scan_skills_in_root(
+            &global_skills_dir(paths),
+            "global",
+            crate::i18n::tr("全局", "Global"),
+            None,
+            None,
+            None,
+            true,
+            &mut seen,
+            &mut s,
+        );
         s.len()
     };
     let global_mcp_count = if global_mcp_config_path(paths).is_file() {
@@ -1515,7 +1538,7 @@ pub fn list_project_rules(paths: &ManagerPaths) -> ProjectRulesOverview {
 
     projects.push(DiscoveredProject {
         id: "global".to_string(),
-        name: "全局配置 (~/.gemini/config)".to_string(),
+        name: global_name.to_string(),
         root_path: clean_win_display(&global_dir),
         source: "global".to_string(),
         exists: global_dir.is_dir(),

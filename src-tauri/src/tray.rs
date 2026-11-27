@@ -208,17 +208,53 @@ fn emit_toast(app: &AppHandle, message: impl Into<String>, tone: &str) {
     );
 }
 
-pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
-    let act_launch = MenuItem::with_id(app, "tray_launch", "唤醒 Antigravity", true, None::<&str>)?;
-    let act_show = MenuItem::with_id(app, "tray_show", "打开主窗口", true, None::<&str>)?;
+fn build_tray_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
+    let act_launch = MenuItem::with_id(
+        app,
+        "tray_launch",
+        crate::i18n::tr("唤醒 Antigravity", "Wake Antigravity"),
+        true,
+        None::<&str>,
+    )?;
+    let act_show = MenuItem::with_id(
+        app,
+        "tray_show",
+        crate::i18n::tr("打开主窗口", "Open Main Window"),
+        true,
+        None::<&str>,
+    )?;
     let sep1 = PredefinedMenuItem::separator(app)?;
-    let act_attach = MenuItem::with_id(app, "tray_attach", "热附着插件", true, None::<&str>)?;
-    let act_stop = MenuItem::with_id(app, "tray_stop", "停止全部扩展", true, None::<&str>)?;
-    let act_cleanup = MenuItem::with_id(app, "tray_cleanup", "清理残留进程", true, None::<&str>)?;
+    let act_attach = MenuItem::with_id(
+        app,
+        "tray_attach",
+        crate::i18n::tr("热附着插件", "Hot Attach Plugins"),
+        true,
+        None::<&str>,
+    )?;
+    let act_stop = MenuItem::with_id(
+        app,
+        "tray_stop",
+        crate::i18n::tr("停止全部扩展", "Stop All Plugins"),
+        true,
+        None::<&str>,
+    )?;
+    let act_cleanup = MenuItem::with_id(
+        app,
+        "tray_cleanup",
+        crate::i18n::tr("清理残留进程", "Clean Residual Processes"),
+        true,
+        None::<&str>,
+    )?;
     let sep2 = PredefinedMenuItem::separator(app)?;
-    let act_quit = MenuItem::with_id(app, "tray_quit", "退出", true, None::<&str>)?;
+    let act_quit = MenuItem::with_id(
+        app,
+        "tray_quit",
+        crate::i18n::tr("退出", "Quit"),
+        true,
+        None::<&str>,
+    )?;
 
-    let menu = Menu::with_items(
+    Menu::with_items(
         app,
         &[
             &act_launch,
@@ -230,7 +266,19 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
             &sep2,
             &act_quit,
         ],
-    )?;
+    )
+}
+
+pub fn update_tray_menu(app: &AppHandle) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        if let Ok(menu) = build_tray_menu(app) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    }
+}
+
+pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
+    let menu = build_tray_menu(app)?;
 
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .tooltip("AGY Dock")
@@ -252,15 +300,26 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
                                 if res.skipped {
                                     emit_toast(
                                         &app_handle,
-                                        res.message.unwrap_or_else(|| "启动已跳过".to_string()),
+                                        res.message.unwrap_or_else(|| {
+                                            crate::i18n::tr("启动已跳过", "Launch skipped")
+                                                .to_string()
+                                        }),
                                         "info",
                                     );
                                 } else {
-                                    emit_toast(&app_handle, "Antigravity 已就绪并完成插件附着", "ok");
+                                    emit_toast(
+                                        &app_handle,
+                                        crate::i18n::tr(
+                                            "Antigravity 已就绪并完成插件附着",
+                                            "Antigravity is ready and plugins are attached",
+                                        ),
+                                        "ok",
+                                    );
                                 }
                             }
                             Err(err) => {
-                                emit_toast(&app_handle, format!("启动失败: {err}"), "error");
+                                let prefix = crate::i18n::tr("启动失败", "Launch failed");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
                             }
                         }
                     });
@@ -278,10 +337,23 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
                                 if let Ok(ov) = supervisor::get_overview(&paths).await {
                                     let _ = app_handle.emit(events::OVERVIEW_UPDATED, &ov);
                                 }
-                                emit_toast(&app_handle, "已完成启用插件热附着", "ok");
+                                emit_toast(
+                                    &app_handle,
+                                    crate::i18n::tr(
+                                        "已完成启用插件热附着",
+                                        "Hot-attached enabled plugins",
+                                    ),
+                                    "ok",
+                                );
                             }
-                            Ok(Err(err)) => emit_toast(&app_handle, format!("热附着失败: {err}"), "error"),
-                            Err(err) => emit_toast(&app_handle, format!("热附着异常: {err}"), "error"),
+                            Ok(Err(err)) => {
+                                let prefix = crate::i18n::tr("热附着失败", "Hot attach failed");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
+                            Err(err) => {
+                                let prefix = crate::i18n::tr("热附着异常", "Hot attach error");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
                         }
                     });
                 }
@@ -297,10 +369,25 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
                                 if let Ok(ov) = supervisor::get_overview(&paths).await {
                                     let _ = app_handle.emit(events::OVERVIEW_UPDATED, &ov);
                                 }
-                                emit_toast(&app_handle, "已停止全部托管插件", "info");
+                                emit_toast(
+                                    &app_handle,
+                                    crate::i18n::tr(
+                                        "已停止全部托管插件",
+                                        "Stopped all managed plugins",
+                                    ),
+                                    "info",
+                                );
                             }
-                            Ok(Err(err)) => emit_toast(&app_handle, format!("停止插件失败: {err}"), "error"),
-                            Err(err) => emit_toast(&app_handle, format!("停止插件异常: {err}"), "error"),
+                            Ok(Err(err)) => {
+                                let prefix =
+                                    crate::i18n::tr("停止插件失败", "Failed to stop plugins");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
+                            Err(err) => {
+                                let prefix =
+                                    crate::i18n::tr("停止插件异常", "Error stopping plugins");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
                         }
                     });
                 }
@@ -317,24 +404,36 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), tauri::Error> {
                                 if cleanup.skipped {
                                     emit_toast(
                                         &app_handle,
-                                        cleanup
-                                            .reason
-                                            .unwrap_or_else(|| "Antigravity 主窗口仍在运行".to_string()),
+                                        cleanup.reason.unwrap_or_else(|| {
+                                            crate::i18n::tr(
+                                                "Antigravity 主窗口仍在运行",
+                                                "Antigravity main window is still running",
+                                            )
+                                            .to_string()
+                                        }),
                                         "warn",
                                     );
                                 } else {
                                     if let Ok(ov) = supervisor::get_overview(&paths).await {
                                         let _ = app_handle.emit(events::OVERVIEW_UPDATED, &ov);
                                     }
-                                    emit_toast(
-                                        &app_handle,
-                                        format!("已清理 {} 个残留进程", cleanup.killed_pids.len()),
-                                        "ok",
-                                    );
+                                    let count = cleanup.killed_pids.len();
+                                    let msg = if crate::i18n::is_en() {
+                                        format!("Cleaned {count} residual process(es)")
+                                    } else {
+                                        format!("已清理 {count} 个残留进程")
+                                    };
+                                    emit_toast(&app_handle, msg, "ok");
                                 }
                             }
-                            Ok(Err(err)) => emit_toast(&app_handle, format!("清理失败: {err}"), "error"),
-                            Err(err) => emit_toast(&app_handle, format!("清理异常: {err}"), "error"),
+                            Ok(Err(err)) => {
+                                let prefix = crate::i18n::tr("清理失败", "Cleanup failed");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
+                            Err(err) => {
+                                let prefix = crate::i18n::tr("清理异常", "Cleanup error");
+                                emit_toast(&app_handle, format!("{prefix}: {err}"), "error");
+                            }
                         }
                     });
                 }

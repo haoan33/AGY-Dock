@@ -24,6 +24,7 @@ import { SpringSwitch, StatusPill } from "../components/MotionPrimitives";
 import { SpaceTreemap } from "../components/SpaceTreemap";
 import { StorageDeleteModal, type StorageDeleteDialogState } from "../components/StorageDeleteModal";
 import { formatBytes, formatErrorMessage, formatIdleAge, formatMtime, idleAgeDays } from "../lib/format";
+import { tr, useI18n } from "../lib/i18n";
 import { ipc, isTauriRuntime } from "../lib/ipc";
 import { buildProjectStorageTree, canDrillStorageNode } from "../lib/storage";
 import type {
@@ -49,17 +50,30 @@ interface StoragePageProps {
 type StorageSource = "local" | "projects";
 const LIST_CHECKBOX_CLASS = "size-4 shrink-0 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed";
 
-const KIND_LABELS: Record<string, string> = {
-  root: "根目录",
-  category: "分类",
-  dir: "目录",
-  project: "项目目录",
-  session: "会话",
-  session_files: "会话产出",
-  session_pb: "对话库",
-  file: "文件",
-  aggregate: "聚合折叠",
-};
+function getKindLabel(kind: string): string {
+  switch (kind) {
+    case "root":
+      return tr("根目录", "Root");
+    case "category":
+      return tr("分类", "Category");
+    case "dir":
+      return tr("目录", "Folder");
+    case "project":
+      return tr("项目目录", "Project");
+    case "session":
+      return tr("会话", "Session");
+    case "session_files":
+      return tr("会话产出", "Artifacts");
+    case "session_pb":
+      return tr("对话库", "Chat History");
+    case "file":
+      return tr("文件", "File");
+    case "aggregate":
+      return tr("聚合折叠", "Grouped");
+    default:
+      return kind;
+  }
+}
 
 const DEL_TONE_MAP: Record<string, "ok" | "warn" | "danger" | "muted"> = {
   safe: "ok",
@@ -96,16 +110,19 @@ function findTrail(
       if (children.length === 0) break;
       const aggNode: StorageNode = {
         nodeId: segId,
-        name: `其余 ${children.length} 项`,
+        name: tr(`其余 ${children.length} 项`, `${children.length} other items`),
         kind: "aggregate",
         category: cur.category,
         sizeBytes: children.reduce((s, c) => s + c.sizeBytes, 0),
         fileCount: children.reduce((s, c) => s + c.fileCount, 0),
         path: cur.path,
-        subtitle: `折叠的 ${children.length} 个较小条目`,
-        purposeDesc: `此处折叠了 ${children.length} 个占用空间较小的条目，点击下方列表即可查看与清理。`,
+        subtitle: tr(`折叠的 ${children.length} 个较小条目`, `${children.length} smaller grouped items`),
+        purposeDesc: tr(
+          `此处折叠了 ${children.length} 个占用空间较小的条目，点击下方列表即可查看与清理。`,
+          `${children.length} smaller items are grouped here. Inspect and clean them in the list below.`,
+        ),
         deletability: "caution",
-        deletabilityLabel: "聚合折叠 · 展开查看",
+        deletabilityLabel: tr("聚合折叠 · 展开查看", "Grouped · Expand to view"),
         protected: false,
         sessionId: "",
         mtime: children.reduce((m, c) => Math.max(m, c.mtime || 0), 0),
@@ -139,6 +156,7 @@ function findNodeDeep(root: StorageNode, nodeId: string): StorageNode | null {
 }
 
 export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: StoragePageProps) {
+  const { lang, t } = useI18n();
   const [source, setSource] = useState<StorageSource>("local");
   const isProjectSource = source === "projects";
   const [localViewMode, setLocalViewMode] = useState<StorageViewMode>("session");
@@ -248,11 +266,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
         }
       }
     } catch (err) {
-      if (scanGeneration.current === request) onToast(`扫描存储失败：${formatErrorMessage(err)}`, "error");
+      if (scanGeneration.current === request) {
+        onToast(t(`扫描存储失败：${formatErrorMessage(err)}`, `Storage scan failed: ${formatErrorMessage(err)}`), "error");
+      }
     } finally {
       if (scanGeneration.current === request) setScanning(false);
     }
-  }, [source, activeProject, localViewMode, includeAppdata, query, onToast, onScanStart, applyLocalView]);
+  }, [source, activeProject, localViewMode, includeAppdata, query, onToast, onScanStart, applyLocalView, t]);
 
   useEffect(() => {
     if (initialScanStarted.current) return;
@@ -280,7 +300,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
         if (!cancelled && generation === scanGeneration.current && !isProjectSource
           && localView && localView.mode !== localViewMode) {
           setLocalViewMode(localView.mode);
-          onToast(`切换分组失败：${formatErrorMessage(err)}`, "error");
+          onToast(t(`切换分组失败：${formatErrorMessage(err)}`, `Failed to switch grouping: ${formatErrorMessage(err)}`), "error");
         }
       }
     });
@@ -309,13 +329,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     return inventory
       ? buildProjectStorageTree(inventory, query, activeProject?.nodeId ?? null, projectSnapshot?.tree ?? null)
       : null;
-  }, [isProjectSource, localView, inventory, query, activeProject, projectSnapshot]);
+  }, [isProjectSource, localView, inventory, query, activeProject, projectSnapshot, lang]);
   const { focus: focusNode, trail } = useMemo(() => {
     if (!rootTree) {
       return { focus: null as StorageNode | null, trail: [] as StorageNode[] };
     }
     return findTrail(rootTree, pathIds, aggMembers);
-  }, [rootTree, pathIds, aggMembers]);
+  }, [rootTree, pathIds, aggMembers, lang]);
 
   const inspectorNode = useMemo(() => {
     if (!focusNode) return null;
@@ -568,7 +588,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     try {
       await ipc.openPathInExplorer(path);
     } catch (err) {
-      onToast(`打开目录失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开目录失败：${formatErrorMessage(err)}`, `Failed to open folder: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -583,9 +603,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     setDeleteDialog({
       open: true,
       mode: "session_files",
-      title: valid.length === 1 ? "仅清理会话产出文件" : `批量清理 ${valid.length} 个会话的产出文件`,
-      summaryText:
+      title: valid.length === 1
+        ? t("仅清理会话产出文件", "Clean Session Artifacts Only")
+        : t(`批量清理 ${valid.length} 个会话的产出文件`, `Clean Artifacts for ${valid.length} Sessions`),
+      summaryText: t(
         `将删除 ${valid.length} 个会话在 brain/ 目录下的产出文件与日志（约 ${formatBytes(totalBytes)}），保留主对话历史与侧栏记录。`,
+        `Deletes artifact files and logs under brain/ for ${valid.length} session(s) (~${formatBytes(totalBytes)}), keeping main chat history and sidebar entries.`,
+      ),
       targetsPreview: valid.map((n) => `${n.name} (${n.sessionId.slice(0, 8)})`),
       hasProtected: false,
       antigravityRunning: agyRunning,
@@ -601,9 +625,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     setDeleteDialog({
       open: true,
       mode: "session",
-      title: valid.length === 1 ? "删除整个会话" : `批量删除 ${valid.length} 个会话`,
-      summaryText:
+      title: valid.length === 1
+        ? t("删除整个会话", "Delete Entire Session")
+        : t(`批量删除 ${valid.length} 个会话`, `Delete ${valid.length} Sessions`),
+      summaryText: t(
         `将移除所选 ${valid.length} 个会话的产出文件与对话库记录（共约 ${formatBytes(totalBytes)}）；若 Antigravity 未运行，会同步清理侧栏索引。`,
+        `Removes artifacts and chat history for ${valid.length} selected session(s) (~${formatBytes(totalBytes)}). If Antigravity is closed, sidebar index entries will also be cleaned.`,
+      ),
       targetsPreview: valid.map((n) => `${n.name} · ${formatBytes(n.sizeBytes)}`),
       hasProtected: false,
       antigravityRunning: agyRunning,
@@ -620,15 +648,15 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     for (const n of deletable) {
       totalBytes += n.sizeBytes;
       if (n.protected) hasProt = true;
-      for (const t of n.deleteTargets) {
-        if (!seen.has(t)) {
-          seen.add(t);
-          targets.push(t);
+      for (const targetPath of n.deleteTargets) {
+        if (!seen.has(targetPath)) {
+          seen.add(targetPath);
+          targets.push(targetPath);
         }
       }
     }
     if (targets.length === 0) {
-      onToast("所选条目没有可直接删除的磁盘路径", "warn");
+      onToast(t("所选条目没有可直接删除的磁盘路径", "Selected items have no deletable disk paths"), "warn");
       return;
     }
     const deletingProjects = deletable.every((node) => node.kind === "project");
@@ -638,11 +666,14 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     setDeleteDialog({
       open: true,
       mode: deletingProjects ? "projects" : "items",
-      title: deletingProjects ? `删除 ${targets.length} 个项目目录` :
-        deletable.length === 1 ? `清理 ${deletable[0].name}` : `批量清理 ${deletable.length} 个条目`,
+      title: deletingProjects
+        ? t(`删除 ${targets.length} 个项目目录`, `Delete ${targets.length} Project Folder(s)`)
+        : deletable.length === 1
+          ? t(`清理 ${deletable[0].name}`, `Clean ${deletable[0].name}`)
+          : t(`批量清理 ${deletable.length} 个条目`, `Clean ${deletable.length} Items`),
       summaryText: deletingProjects
-        ? "将删除以下项目目录及其中的全部文件和子目录。"
-        : `共涉及 ${targets.length} 个磁盘路径（约 ${formatBytes(totalBytes)}）。`,
+        ? t("将删除以下项目目录及其中的全部文件和子目录。", "Deletes the following project folder(s) along with all files and subdirectories inside.")
+        : t(`共涉及 ${targets.length} 个磁盘路径（约 ${formatBytes(totalBytes)}）。`, `${targets.length} disk path(s) (~${formatBytes(totalBytes)}).`),
       targetsPreview: targets,
       hasProtected: hasProt,
       antigravityRunning: agyRunning,
@@ -670,38 +701,65 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
 
       const freed = formatBytes(res.freedBytes);
       const cnt = res.deletedCount || res.deletedPaths.length;
-      const modeLabel = res.permanent ? "已彻底删除" : "已移入回收站";
-      const projectSummary = `${modeLabel} ${cnt} 个项目目录`;
+      const modeLabel = res.permanent
+        ? t("已彻底删除", "Permanently deleted")
+        : t("已移入回收站", "Moved to Recycle Bin");
+      const projectSummary = t(`${modeLabel} ${cnt} 个项目目录`, `${modeLabel} ${cnt} project folder(s)`);
       if (res.lockedPaths.length > 0 || res.warnings.length > 0) {
         if (cnt > 0 && deletingProjects) {
           onToast(projectSummary, "warn");
         } else if (cnt > 0) {
           onToast(
-            `部分清理：释放 ${freed}，${res.lockedPaths.length || res.warnings.length} 项未清理`,
+            t(
+              `部分清理：释放 ${freed}，${res.lockedPaths.length || res.warnings.length} 项未清理`,
+              `Partially cleaned: freed ${freed}, ${res.lockedPaths.length || res.warnings.length} item(s) skipped`,
+            ),
             "warn",
           );
         } else {
-          onToast(isProjectSource ? "所选项目文件未能清理" : "文件正被占用，未能删除（请先关闭 Antigravity）", "warn");
+          onToast(
+            isProjectSource
+              ? t("所选项目文件未能清理", "Could not delete selected project files")
+              : t("文件正被占用，未能删除（请先关闭 Antigravity）", "Files are in use and could not be deleted (close Antigravity first)"),
+            "warn",
+          );
         }
         const items = res.warnings.length > 0 ? res.warnings : res.lockedPaths;
         const preview = items.slice(0, 6).map((w) => `• ${w}`).join("\n");
-        const more = items.length > 6 ? `\n... 以及其余 ${items.length - 6} 项` : "";
+        const more = items.length > 6 ? t(`\n... 以及其余 ${items.length - 6} 项`, `\n... and ${items.length - 6} more`) : "";
         setNoticeModal({
-          title: deletingProjects ? "项目目录删除结果" : isProjectSource ? "有项目条目未清理" : "部分文件正被程序占用",
-          body: isProjectSource ? preview + more :
-            "以下文件正被运行中的 Antigravity 或其他程序占用，暂时无法删除；其余未占用文件已完成清理。\n\n" +
-            "如需彻底删除这些会话并同步更新 Antigravity 对话列表，请先退出 Antigravity 后重试：\n" +
-            preview +
-            more,
+          title: deletingProjects
+            ? t("项目目录删除结果", "Project Folder Deletion Result")
+            : isProjectSource
+              ? t("有项目条目未清理", "Some Project Items Were Not Deleted")
+              : t("部分文件正被程序占用", "Some Files Are In Use"),
+          body: isProjectSource
+            ? preview + more
+            : t(
+                "以下文件正被运行中的 Antigravity 或其他程序占用，暂时无法删除；其余未占用文件已完成清理。\n\n" +
+                  "如需彻底删除这些会话并同步更新 Antigravity 对话列表，请先退出 Antigravity 后重试：\n",
+                "The following files are currently locked by Antigravity or another process and could not be deleted; all other unlocked files have been cleaned.\n\n" +
+                  "To fully delete these sessions and sync the Antigravity sidebar list, close Antigravity and try again:\n",
+              ) +
+              preview +
+              more,
         });
       } else {
         let extra = "";
         if (res.mode === "session" && res.antigravityRunning) {
-          extra = "（AGY 运行中未同步列表；关闭后可点「清理失效记录」）";
+          extra = t(
+            "（AGY 运行中未同步列表；关闭后可点「清理失效记录」）",
+            " (Sidebar not synced while AGY is running; close AGY and click Clean Stale)",
+          );
         } else if (res.mode === "session" && (res.dbCleaned || res.protoCleaned)) {
-          extra = " · 已同步 Antigravity 对话列表";
+          extra = t(" · 已同步 Antigravity 对话列表", " · Synced Antigravity chat list");
         }
-        onToast(deletingProjects ? projectSummary : `${modeLabel} ${cnt} 项 · 释放 ${freed}${extra}`, "ok");
+        onToast(
+          deletingProjects
+            ? projectSummary
+            : t(`${modeLabel} ${cnt} 项 · 释放 ${freed}${extra}`, `${modeLabel} ${cnt} item(s) · freed ${freed}${extra}`),
+          "ok",
+        );
       }
 
       setCheckedIds(new Set());
@@ -720,7 +778,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
       }
     } catch (err) {
       setDeleteDialog(null);
-      onToast(`清理失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`清理失败：${formatErrorMessage(err)}`, `Cleanup failed: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -729,10 +787,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     const running = await ipc.isAntigravityRunningForStorage().catch(() => false);
     if (running) {
       setNoticeModal({
-        title: "请先关闭 Antigravity",
-        body:
+        title: t("请先关闭 Antigravity", "Close Antigravity First"),
+        body: t(
           "检测到 Antigravity 仍在运行。\n\n" +
-          "为防止内存中的历史列表重新覆盖磁盘索引，请先完全退出 Antigravity 后，再点击「清理失效记录」。",
+            "为防止内存中的历史列表重新覆盖磁盘索引，请先完全退出 Antigravity 后，再点击「清理失效记录」。",
+          "Antigravity is currently running.\n\n" +
+            "To prevent its in-memory history list from overwriting the disk index, fully exit Antigravity before clicking \"Clean Stale\".",
+        ),
       });
       return;
     }
@@ -745,16 +806,22 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
       const res = await ipc.cleanOrphanStorageSummaries();
       setOrphanConfirmOpen(false);
       if (res.antigravityRunning) {
-        onToast("Antigravity 正在运行，请先关闭后重试", "warn");
+        onToast(t("Antigravity 正在运行，请先关闭后重试", "Antigravity is running. Please close it and try again"), "warn");
       } else if (res.deletedCount > 0) {
-        onToast(`已同步移除 ${res.deletedCount} 条失效列表记录`, "ok");
+        onToast(t(`已同步移除 ${res.deletedCount} 条失效列表记录`, `Removed ${res.deletedCount} stale sidebar record(s)`), "ok");
       } else {
-        onToast("未能写入历史索引（可能仍被占用），请确认 Antigravity 已完全退出", "warn");
+        onToast(
+          t(
+            "未能写入历史索引（可能仍被占用），请确认 Antigravity 已完全退出",
+            "Could not update history index (may still be in use). Make sure Antigravity has fully exited",
+          ),
+          "warn",
+        );
       }
       await runFullScan();
     } catch (err) {
       setOrphanConfirmOpen(false);
-      onToast(`清理失效记录失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`清理失效记录失败：${formatErrorMessage(err)}`, `Failed to clean stale records: ${formatErrorMessage(err)}`), "error");
     } finally {
       setOrphanBusy(false);
     }
@@ -808,7 +875,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     if (canDrillStorageNode(inspectorNode) && (!isProjectSource || inspectorNode.nodeId !== focusNode?.nodeId)) {
       actions.push({
         key: "drill",
-        label: "深入查看",
+        label: t("深入查看", "Inspect"),
         icon: <ZoomIn className="h-3.5 w-3.5 shrink-0" />,
         variant: "secondary",
         onClick: () => handleDrillNode(inspectorNode),
@@ -818,7 +885,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     if (inspectorNode.path) {
       actions.push({
         key: "explorer",
-        label: "打开目录",
+        label: t("打开目录", "Open Folder"),
         icon: <FolderOpen className="h-3.5 w-3.5 shrink-0" />,
         variant: "secondary",
         onClick: () => openExplorer(inspectorNode.path),
@@ -835,7 +902,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
           : inspectorNode.deleteTargets.length === 0;
       actions.push({
         key: "delete-session-files",
-        label: "仅删会话文件",
+        label: t("仅删会话文件", "Clean Artifacts"),
         icon: <FileX2 className="h-3.5 w-3.5 shrink-0" />,
         variant: "warn",
         disabled: noFiles,
@@ -846,7 +913,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     if (inspectorNode.kind === "session" && inspectorNode.sessionId) {
       actions.push({
         key: "delete-session",
-        label: "删除会话",
+        label: t("删除会话", "Delete Session"),
         icon: <Trash2 className="h-3.5 w-3.5 shrink-0" />,
         variant: "danger",
         onClick: () => openDeleteSessionDialog([inspectorNode]),
@@ -859,8 +926,11 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     ) {
       actions.push({
         key: "delete-item",
-        label: inspectorNode.kind === "project" ? "删除项目目录" :
-          inspectorNode.kind === "file" ? "删除此文件" : "清理此项",
+        label: inspectorNode.kind === "project"
+          ? t("删除项目目录", "Delete Project")
+          : inspectorNode.kind === "file"
+            ? t("删除此文件", "Delete File")
+            : t("清理此项", "Clean Item"),
         icon: <Trash2 className="h-3.5 w-3.5 shrink-0" />,
         variant: "danger",
         onClick: () => openDeleteItemsDialog([inspectorNode]),
@@ -870,7 +940,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
     if (inspectorNode.manuallyAdded && !activeProject) {
       actions.push({
         key: "remove-project",
-        label: "移出项目列表",
+        label: t("移出项目列表", "Remove from List"),
         icon: <X className="h-3.5 w-3.5 shrink-0" />,
         variant: "secondary",
         disabled: scanning || editingProjects,
@@ -880,7 +950,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
 
     return actions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inspectorNode, focusNode, pathIds, scanning, editingProjects]);
+  }, [inspectorNode, focusNode, pathIds, scanning, editingProjects, lang]);
 
   const changeSearch = (value: string) => {
     setQuery(value);
@@ -892,12 +962,22 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
   const activeSize = isProjectSource ? focusNode?.sizeBytes ?? 0 : snapshotResp?.totalBytes ?? 0;
   const activeFileCount = isProjectSource ? focusNode?.fileCount ?? 0 : snapshotResp?.totalFiles ?? 0;
   const storageSummary = displayStyle === "list" && viewMode === "session"
-    ? `${listItems.length} 个会话 · ${formatBytes(listTotalBytes)}`
-    : `${formatBytes(activeSize)} · ${activeFileCount.toLocaleString()} 文件${
-        isProjectSource
-          ? activeProject ? "" : ` · ${rootTree?.children.length ?? 0} 个目录`
-          : ` · ${snapshotResp?.sessionCount ?? 0} 会话`
-      }`;
+    ? t(
+        `${listItems.length} 个会话 · ${formatBytes(listTotalBytes)}`,
+        `${listItems.length} sessions · ${formatBytes(listTotalBytes)}`,
+      )
+    : t(
+        `${formatBytes(activeSize)} · ${activeFileCount.toLocaleString()} 文件${
+          isProjectSource
+            ? activeProject ? "" : ` · ${rootTree?.children.length ?? 0} 个目录`
+            : ` · ${snapshotResp?.sessionCount ?? 0} 会话`
+        }`,
+        `${formatBytes(activeSize)} · ${activeFileCount.toLocaleString()} files${
+          isProjectSource
+            ? activeProject ? "" : ` · ${rootTree?.children.length ?? 0} folders`
+            : ` · ${snapshotResp?.sessionCount ?? 0} sessions`
+        }`,
+      );
 
   const visibleScanProgress = (isProjectSource && !activeProject)
     ? scanProgress?.phase === "projects" ? scanProgress : null
@@ -911,8 +991,8 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
         <section className="agy-card shrink-0 px-3 py-2">
           <div className="flex min-w-0 items-center gap-1.5">
-            <div role="group" aria-label="存储范围" className="inline-flex h-7 shrink-0 items-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-0.5">
-              {([["local", "AGY 本地数据"], ["projects", "项目文件"]] as const).map(([value, label]) => (
+            <div role="group" aria-label={t("存储范围", "Storage scope")} className="inline-flex h-7 shrink-0 items-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-0.5">
+              {([["local", t("AGY 本地数据", "AGY Local")], ["projects", t("项目文件", "Projects")]] as const).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -936,9 +1016,9 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
             <div className="inline-flex h-7 shrink-0 items-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-0.5">
               {(
                 [
-                  ["session", "按会话"],
-                  ["type", "按文件类型"],
-                  ["dir", "按目录结构"],
+                  ["session", t("按会话", "By Session")],
+                  ["type", t("按文件类型", "By Type")],
+                  ["dir", t("按目录结构", "By Folder")],
                 ] as Array<[StorageViewMode, string]>
               ).map(([m, label]) => {
                 const active = localViewMode === m;
@@ -969,8 +1049,8 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
             <div className="inline-flex h-7 shrink-0 items-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-0.5">
               {(
                 [
-                  ["treemap", "方框", Layers],
-                  ["list", "列表", ListChecks],
+                  ["treemap", t("方框", "Treemap"), Layers],
+                  ["list", t("列表", "List"), ListChecks],
                 ] as const
               ).map(([styleKey, styleLabel, Icon]) => {
                 const active = displayStyle === styleKey;
@@ -1005,8 +1085,14 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                 type="search"
                 value={query}
                 onChange={(e) => changeSearch(e.target.value)}
-                aria-label="搜索存储内容"
-                placeholder={isProjectSource && !activeProject ? "搜索项目或路径…" : isProjectSource ? "搜索文件或目录…" : "搜索会话或文件…"}
+                aria-label={t("搜索存储内容", "Search storage")}
+                placeholder={
+                  isProjectSource && !activeProject
+                    ? t("搜索项目或路径…", "Search projects or paths…")
+                    : isProjectSource
+                      ? t("搜索文件或目录…", "Search files or folders…")
+                      : t("搜索会话或文件…", "Search sessions or files…")
+                }
                 className="agy-input agy-search-input h-7 w-full pl-8 pr-2 text-[11.5px]"
               />
             </div>
@@ -1014,7 +1100,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
             {!isProjectSource && (
               <label className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-1.5 text-[11.5px] whitespace-nowrap text-[var(--text-muted)]">
                 <SpringSwitch checked={includeAppdata} onChange={setIncludeAppdata} compact />
-                含应用缓存
+                {t("含应用缓存", "App Cache")}
               </label>
             )}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -1026,31 +1112,31 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   className="agy-btn h-7 gap-1.5 px-2 text-[11.5px]"
                 >
                   <FolderPlus className="h-3.5 w-3.5" />
-                  添加项目
+                  {t("添加项目", "Add Project")}
                 </button>
               )}
               {orphanCount > 0 && (
                 <button
                   type="button"
                   onClick={handleClickOrphanButton}
-                  title={`清理失效记录（${orphanCount}）`}
-                  aria-label={`清理失效记录（${orphanCount}）`}
+                  title={t(`清理失效记录（${orphanCount}）`, `Clean Stale Records (${orphanCount})`)}
+                  aria-label={t(`清理失效记录（${orphanCount}）`, `Clean Stale Records (${orphanCount})`)}
                   className="agy-btn h-7 gap-1.5 px-2 text-[11.5px] text-[var(--warn)]"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span className="hidden min-[1120px]:inline">清理失效记录</span>
+                  <span className="hidden min-[1120px]:inline">{t("清理失效记录", "Clean Stale")}</span>
                 </button>
               )}
               <button
                 type="button"
                 disabled={scanning || editingProjects}
                 onClick={() => runFullScan()}
-                aria-label="重新扫描"
-                title="重新扫描"
+                aria-label={t("重新扫描", "Rescan")}
+                title={t("重新扫描", "Rescan")}
                 className="agy-btn h-7 gap-1.5 px-2 text-[11.5px]"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${scanning ? "animate-spin" : ""}`} />
-                <span className="hidden min-[1040px]:inline">{scanning ? "扫描中" : "重新扫描"}</span>
+                <span className="hidden min-[1040px]:inline">{scanning ? t("扫描中", "Scanning") : t("重新扫描", "Rescan")}</span>
               </button>
             </div>
           </div>
@@ -1061,8 +1147,8 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                 <button
                   type="button"
                   onClick={handleNavigateUp}
-                  aria-label="返回上级"
-                  title="返回上级"
+                  aria-label={t("返回上级", "Go Up")}
+                  title={t("返回上级", "Go Up")}
                   className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
@@ -1104,7 +1190,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     ) : (
                       <ArrowUpNarrowWide className="h-3 w-3" />
                     )}
-                    <span>最近更新</span>
+                    <span>{t("最近更新", "Updated")}</span>
                   </button>
 
                   <button
@@ -1121,7 +1207,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     ) : (
                       <ArrowDownWideNarrow className="h-3 w-3" />
                     )}
-                    <span>占用空间</span>
+                    <span>{t("占用空间", "Size")}</span>
                   </button>
                 </div>
 
@@ -1131,9 +1217,9 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     <div className="inline-flex h-6 shrink-0 items-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)]/70 p-0.5">
                       {(
                         [
-                          ["all", "全部时间"],
-                          ["7d", "> 7天未用"],
-                          ["30d", "> 30天未用"],
+                          ["all", t("全部时间", "All Time")],
+                          ["7d", t("> 7天未用", "> 7d idle")],
+                          ["30d", t("> 30天未用", "> 30d idle")],
                         ] as Array<[StorageAgeFilter, string]>
                       ).map(([ak, al]) => {
                         const active = ageFilter === ak;
@@ -1168,9 +1254,9 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     <div className="flex shrink-0 items-center gap-1">
                       {(
                         [
-                          ["archived", "已归档"],
-                          ["subagent", "子代理会话"],
-                          ["unnamed", "未命名会话"],
+                          ["archived", t("已归档", "Archived")],
+                          ["subagent", t("子代理会话", "Subagent")],
+                          ["unnamed", t("未命名会话", "Unnamed")],
                         ] as Array<[StorageAttrFilter, string]>
                       ).map(([fk, fl]) => {
                         const active = attrFilters.has(fk);
@@ -1200,8 +1286,11 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
               {scanning ? (
                 <span role="status" className="max-w-[190px] truncate" title={visibleScanProgress?.currentPath}>
                   {visibleScanProgress?.phase === "projects"
-                    ? `统计项目 ${visibleScanProgress.rootIndex}/${visibleScanProgress.rootCount}`
-                    : "正在扫描…"}
+                    ? t(
+                        `统计项目 ${visibleScanProgress.rootIndex}/${visibleScanProgress.rootCount}`,
+                        `Scanning projects ${visibleScanProgress.rootIndex}/${visibleScanProgress.rootCount}`,
+                      )
+                    : t("正在扫描…", "Scanning…")}
                 </span>
               ) : (
                 <span>{storageSummary}</span>
@@ -1246,8 +1335,11 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     <Info className="h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
                     <span className="min-w-0 truncate text-[var(--text-muted)]">
                       {hintTarget
-                        ? `${hintTarget.name}：${hintTarget.purposeDesc || hintTarget.subtitle || hintTarget.path}`
-                        : "悬停方块查看内容用途，点击选中详情，双击深入下一层级，右键快捷清理"}
+                        ? `${hintTarget.name}${t("：", ": ")}${hintTarget.purposeDesc || hintTarget.subtitle || hintTarget.path}`
+                        : t(
+                            "悬停方块查看内容用途，点击选中详情，双击深入下一层级，右键快捷清理",
+                            "Hover a tile for details, click to inspect, double-click to drill down, right-click for quick actions",
+                          )}
                     </span>
                   </div>
                   {hintTarget?.deletabilityLabel && (
@@ -1273,15 +1365,17 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                       >
                         <div className="flex flex-wrap items-center gap-1.5">
                           <StatusPill tone="muted">
-                            {KIND_LABELS[inspectorNode.kind] ?? inspectorNode.kind}
+                            {getKindLabel(inspectorNode.kind)}
                           </StatusPill>
                           {inspectorNode.deletabilityLabel && (
                             <StatusPill tone={DEL_TONE_MAP[inspectorNode.deletability] ?? "warn"}>
                               {inspectorNode.deletabilityLabel}
                             </StatusPill>
                           )}
-                          {inspectorNode.protected && inspectorNode.deletabilityLabel !== "受保护配置" && (
-                            <StatusPill tone="danger">受保护</StatusPill>
+                          {inspectorNode.protected &&
+                            inspectorNode.deletabilityLabel !== "受保护配置" &&
+                            inspectorNode.deletabilityLabel !== "Protected Config" && (
+                            <StatusPill tone="danger">{t("受保护", "Protected")}</StatusPill>
                           )}
                         </div>
 
@@ -1304,19 +1398,19 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                         {/* 3 Stats */}
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2.5 py-2 text-center">
-                            <div className="text-[10.5px] text-[var(--text-faint)]">占用大小</div>
+                            <div className="text-[10.5px] text-[var(--text-faint)]">{t("占用大小", "Size")}</div>
                             <div className="mt-0.5 font-mono-code text-[12.5px] font-bold tabular-nums text-[var(--text-primary)]">
                               {formatBytes(inspectorNode.sizeBytes)}
                             </div>
                           </div>
                           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2.5 py-2 text-center">
-                            <div className="text-[10.5px] text-[var(--text-faint)]">占总存储</div>
+                            <div className="text-[10.5px] text-[var(--text-faint)]">{t("占总存储", "Share")}</div>
                             <div className="mt-0.5 font-mono-code text-[12.5px] font-bold tabular-nums text-[var(--text-primary)]">
                               {((inspectorNode.sizeBytes / totalRootBytes) * 100).toFixed(1)}%
                             </div>
                           </div>
                           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2.5 py-2 text-center">
-                            <div className="text-[10.5px] text-[var(--text-faint)]">文件数</div>
+                            <div className="text-[10.5px] text-[var(--text-faint)]">{t("文件数", "Files")}</div>
                             <div className="mt-0.5 font-mono-code text-[12.5px] font-bold tabular-nums text-[var(--text-primary)]">
                               {inspectorNode.fileCount}
                             </div>
@@ -1362,13 +1456,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     {/* Ranked Children List */}
                     <div className="flex min-h-0 flex-1 flex-col border-t border-[var(--border-hairline)] pt-3">
                       <div className="mb-2 flex items-center justify-between text-[11.5px] font-semibold text-[var(--text-muted)]">
-                        <span>当前层级（{rankedChildren.length} 项）</span>
-                        <span>大小占比</span>
+                        <span>{t(`当前层级（${rankedChildren.length} 项）`, `Current Level (${rankedChildren.length})`)}</span>
+                        <span>{t("大小占比", "Share")}</span>
                       </div>
                       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
                         {rankedChildren.length === 0 ? (
                           <div className="py-6 text-center text-[12px] text-[var(--text-faint)]">
-                            当前层级无更多子项
+                            {t("当前层级无更多子项", "No sub-items at this level")}
                           </div>
                         ) : (
                           rankedChildren.map((ch) => {
@@ -1414,7 +1508,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   </>
                 ) : (
                   <div className="flex flex-1 items-center justify-center py-10 text-center text-[12.5px] text-[var(--text-faint)]">
-                    暂无可检视的存储条目
+                    {t("暂无可检视的存储条目", "No storage item selected")}
                   </div>
                 )}
               </aside>
@@ -1433,7 +1527,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
               <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border-hairline)] bg-[var(--bg-subtle)]/70 px-4 py-2.5 text-[11.5px] font-semibold text-[var(--text-muted)]">
                 <input
                   type="checkbox"
-                  aria-label="全选当前列表"
+                  aria-label={t("全选当前列表", "Select all in list")}
                   className={LIST_CHECKBOX_CLASS}
                   ref={(input) => {
                     if (input) input.indeterminate = !allListChecked && selectedListNodes.length > 0;
@@ -1450,18 +1544,20 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   }}
                 />
                 <span className="min-w-0 flex-1">
-                  {viewMode === "session" ? "会话名称 / 产物与对话库详情" : "名称 / 路径"}
+                  {viewMode === "session"
+                    ? t("会话名称 / 产物与对话库详情", "Session / Artifacts & Chat History")
+                    : t("名称 / 路径", "Name / Path")}
                 </span>
-                <span className="w-[175px] shrink-0">最近更新</span>
-                <span className="w-[155px] shrink-0">占用空间</span>
-                <span className="w-[156px] shrink-0 text-right">快捷操作</span>
+                <span className="w-[175px] shrink-0">{t("最近更新", "Updated")}</span>
+                <span className="w-[155px] shrink-0">{t("占用空间", "Size")}</span>
+                <span className="w-[156px] shrink-0 text-right">{t("快捷操作", "Actions")}</span>
               </div>
 
               {/* Scrollable Rows */}
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {listItems.length === 0 ? (
                   <div className="flex h-full items-center justify-center py-12 text-[13px] text-[var(--text-faint)]">
-                    当前筛选条件下没有可清理的会话或存储条目
+                    {t("当前筛选条件下没有可清理的会话或存储条目", "No sessions or storage items match the current filter")}
                   </div>
                 ) : (
                   listItems.map((node, idx) => {
@@ -1472,12 +1568,15 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     const pctOfTotal = (node.sizeBytes / Math.max(1, listTotalBytes)) * 100;
                     const barPct = Math.max(2, (node.sizeBytes / listMaxBytes) * 100);
 
-                    let metaText = node.subtitle || node.path || KIND_LABELS[node.kind] || node.kind;
+                    let metaText = node.subtitle || node.path || getKindLabel(node.kind);
                     if (isSessionMode) {
                       const splitHint =
                         filesBytes > 0
-                          ? `产出 ${formatBytes(filesBytes)} · 对话库 ${formatBytes(pbBytes)}`
-                          : `仅保留对话库 ${formatBytes(pbBytes)}`;
+                          ? t(
+                              `产出 ${formatBytes(filesBytes)} · 对话库 ${formatBytes(pbBytes)}`,
+                              `Artifacts ${formatBytes(filesBytes)} · Chat ${formatBytes(pbBytes)}`,
+                            )
+                          : t(`仅保留对话库 ${formatBytes(pbBytes)}`, `Chat history only (${formatBytes(pbBytes)})`);
                       metaText = metaText ? `${metaText} · ${splitHint}` : splitHint;
                     }
 
@@ -1490,7 +1589,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                       >
                         <input
                           type="checkbox"
-                          aria-label={`选择 ${node.name}`}
+                          aria-label={t(`选择 ${node.name}`, `Select ${node.name}`)}
                           className={LIST_CHECKBOX_CLASS}
                           checked={isChecked}
                           onChange={(event) => handleRowCheck(node.nodeId, idx, event.currentTarget.checked,
@@ -1504,13 +1603,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                               {node.name}
                             </span>
                             {isSessionMode && node.isArchived && (
-                              <StatusPill tone="muted">已归档</StatusPill>
+                              <StatusPill tone="muted">{t("已归档", "Archived")}</StatusPill>
                             )}
                             {isSessionMode && node.isSubagent && (
-                              <StatusPill tone="info">子代理</StatusPill>
+                              <StatusPill tone="info">{t("子代理", "Subagent")}</StatusPill>
                             )}
                             {!isSessionMode && node.protected && (
-                              <StatusPill tone="warn">受保护</StatusPill>
+                              <StatusPill tone="warn">{t("受保护", "Protected")}</StatusPill>
                             )}
                           </div>
                           <p className="mt-0.5 truncate text-[11.5px] text-[var(--text-faint)]">
@@ -1554,17 +1653,17 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                               onClick={() => handleDrillNode(node)}
                               className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-[var(--border-hairline)] px-2 text-[11px] font-medium whitespace-nowrap text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                             >
-                              展开
+                              {t("展开", "Open")}
                             </button>
                           )}
                           {isSessionMode && filesBytes > 0 && (
                             <button
                               type="button"
                               onClick={() => openDeleteSessionFilesDialog([node])}
-                              title="仅删除会话产出文件，保留对话记录"
+                              title={t("仅删除会话产出文件，保留对话记录", "Delete session artifacts only, keeping chat history")}
                               className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-[var(--warn)]/35 bg-[var(--warn-bg)] px-2 text-[11px] font-medium whitespace-nowrap text-[var(--warn)] transition-all hover:brightness-95"
                             >
-                              删产物
+                              {t("删产物", "Artifacts")}
                             </button>
                           )}
                           {isSessionMode ? (
@@ -1573,7 +1672,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                               onClick={() => openDeleteSessionDialog([node])}
                               className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-[var(--danger)]/35 bg-[var(--danger-bg)] px-2 text-[11px] font-medium whitespace-nowrap text-[var(--danger)] transition-all hover:brightness-95"
                             >
-                              删会话
+                              {t("删会话", "Delete")}
                             </button>
                           ) : (
                             node.deleteTargets.length > 0 && (
@@ -1582,7 +1681,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                                 onClick={() => openDeleteItemsDialog([node])}
                                 className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-[var(--danger)]/35 bg-[var(--danger-bg)] px-2 text-[11px] font-medium whitespace-nowrap text-[var(--danger)] transition-all hover:brightness-95"
                               >
-                                {node.kind === "project" ? "删除" : "清理"}
+                                {node.kind === "project" ? t("删除", "Delete") : t("清理", "Clean")}
                               </button>
                             )
                           )}
@@ -1591,8 +1690,8 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                               type="button"
                               disabled={scanning || editingProjects}
                               onClick={() => changeProjectRegistry(node.path)}
-                              aria-label={`移出项目列表 ${node.name}`}
-                              title="移出项目列表"
+                              aria-label={t(`移出项目列表 ${node.name}`, `Remove ${node.name} from list`)}
+                              title={t("移出项目列表", "Remove from list")}
                               className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-subtle)]"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -1602,7 +1701,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                             <button
                               type="button"
                               onClick={() => openExplorer(node.path)}
-                              title="打开所在目录"
+                              title={t("打开所在目录", "Open containing folder")}
                               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border-hairline)] hover:text-[var(--text-primary)]"
                             >
                               <FolderOpen className="h-3.5 w-3.5" />
@@ -1627,10 +1726,10 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   >
                     <div className="flex items-center gap-2 text-[12.5px]">
                       <span className="font-semibold text-[var(--text-primary)]">
-                        已选 {selectedListNodes.length} 项
+                        {t(`已选 ${selectedListNodes.length} 项`, `${selectedListNodes.length} selected`)}
                       </span>
                       <span className="font-mono-code tabular-nums text-[var(--text-muted)]">
-                        共 {formatBytes(selectedListBytes)}
+                        {t(`共 ${formatBytes(selectedListBytes)}`, `Total ${formatBytes(selectedListBytes)}`)}
                       </span>
                       <button
                         type="button"
@@ -1645,7 +1744,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                         }}
                         className="ml-2 cursor-pointer text-[11.5px] font-medium text-[var(--accent)] hover:underline"
                       >
-                        反选
+                        {t("反选", "Invert")}
                       </button>
                       <button
                         type="button"
@@ -1655,7 +1754,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                         }}
                         className="cursor-pointer text-[11.5px] font-medium text-[var(--text-muted)] hover:underline"
                       >
-                        清空
+                        {t("清空", "Clear")}
                       </button>
                     </div>
 
@@ -1669,7 +1768,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                             className="agy-btn h-8 px-3 text-[12px]"
                           >
                             <Trash2 className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" />
-                            <span>仅删除会话文件（保留记录）</span>
+                            <span>{t("仅删除会话文件（保留记录）", "Clean Artifacts Only (Keep History)")}</span>
                           </button>
                           <button
                             type="button"
@@ -1677,7 +1776,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                             className="agy-btn-danger h-8 px-3 text-[12px]"
                           >
                             <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                            <span>删除所选会话</span>
+                            <span>{t("删除所选会话", "Delete Selected Sessions")}</span>
                           </button>
                         </>
                       ) : (
@@ -1688,7 +1787,11 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                           className="agy-btn-danger h-8 px-3 text-[12px]"
                         >
                           <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                          <span>{isProjectSource && !activeProject ? "删除所选项目" : "清理所选条目"}</span>
+                          <span>
+                            {isProjectSource && !activeProject
+                              ? t("删除所选项目", "Delete Selected Projects")
+                              : t("清理所选条目", "Clean Selected Items")}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -1733,7 +1836,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                         className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]"
                       >
                         <FileX2 className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" />
-                        <span>仅删除会话产出文件（保留历史记录）</span>
+                        <span>{t("仅删除会话产出文件（保留历史记录）", "Clean Session Artifacts Only (Keep History)")}</span>
                       </button>
                     )}
 
@@ -1748,7 +1851,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                         className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--danger)] hover:bg-[var(--danger-bg)]"
                       >
                         <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                        <span>删除整个会话（文件 + 记录）</span>
+                        <span>{t("删除整个会话（文件 + 记录）", "Delete Entire Session (Files + History)")}</span>
                       </button>
                     )}
                   </>
@@ -1767,8 +1870,13 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--danger)] hover:bg-[var(--danger-bg)]"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                    <span>{contextMenu.node.kind === "project" ? "删除项目目录" :
-                      contextMenu.node.kind === "file" ? "删除此文件" : "清理此项"}</span>
+                    <span>
+                      {contextMenu.node.kind === "project"
+                        ? t("删除项目目录", "Delete Project Folder")
+                        : contextMenu.node.kind === "file"
+                          ? t("删除此文件", "Delete File")
+                          : t("清理此项", "Clean Item")}
+                    </span>
                   </button>
                 )}
 
@@ -1783,7 +1891,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]"
                 >
                   <ZoomIn className="h-3.5 w-3.5 shrink-0" />
-                  <span>深入查看子项</span>
+                  <span>{t("深入查看子项", "Drill Into Sub-items")}</span>
                 </button>
               )}
 
@@ -1798,7 +1906,7 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
                   className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]"
                 >
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-                  <span>打开所在目录</span>
+                  <span>{t("打开所在目录", "Open Containing Folder")}</span>
                 </button>
               )}
             </motion.div>
@@ -1815,12 +1923,14 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
       {/* Orphan Summary Confirm Modal */}
       <ConfirmModal
         open={orphanConfirmOpen}
-        title="清理失效会话列表记录"
-        description={
+        title={t("清理失效会话列表记录", "Clean Stale Session Records")}
+        description={t(
           `检测到 ${orphanCount} 条本地对话文件已不存在的失效记录（通常来自此前清理文件后仍停留在 Antigravity 侧栏的幽灵会话）。\n\n` +
-          "确认将它们从 conversation_summaries.db、agyhub_summaries_proto.pb 与 app_storage.json 中同步移除吗？"
-        }
-        confirmLabel="同步移除"
+            "确认将它们从 conversation_summaries.db、agyhub_summaries_proto.pb 与 app_storage.json 中同步移除吗？",
+          `Found ${orphanCount} stale record(s) whose local chat files no longer exist (usually ghost sessions left in the Antigravity sidebar after manual cleanup).\n\n` +
+            "Remove them from conversation_summaries.db, agyhub_summaries_proto.pb, and app_storage.json?",
+        )}
+        confirmLabel={t("同步移除", "Remove")}
         tone="warn"
         busy={orphanBusy}
         onCancel={() => setOrphanConfirmOpen(false)}
@@ -1830,9 +1940,9 @@ export function StoragePage({ isDark, scanProgress, onScanStart, onToast }: Stor
       {/* Locked / Warning Notice Modal */}
       <ConfirmModal
         open={Boolean(noticeModal)}
-        title={noticeModal?.title ?? "提示"}
+        title={noticeModal?.title ?? t("提示", "Notice")}
         description={noticeModal?.body ?? ""}
-        confirmLabel="知道了"
+        confirmLabel={t("知道了", "OK")}
         tone="warn"
         hideCancel
         onCancel={() => setNoticeModal(null)}

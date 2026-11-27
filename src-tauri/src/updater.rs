@@ -145,7 +145,7 @@ fn default_prompt() -> UpdatePrompt {
     UpdatePrompt {
         title: String::new(),
         body: String::new(),
-        button: "立即更新".to_string(),
+        button: crate::i18n::tr("立即更新", "Update Now").to_string(),
     }
 }
 
@@ -394,24 +394,40 @@ pub async fn check_for_updates(paths: &ManagerPaths, timeout_sec: f64) -> Update
     let prompt_title = prompt_obj
         .and_then(|p| Some(sanitize_plain_text(p.get("title"))))
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| format!("AGY Dock v{latest_version} 已发布"));
+        .unwrap_or_else(|| {
+            if crate::i18n::is_en() {
+                format!("AGY Dock v{latest_version} is available")
+            } else {
+                format!("AGY Dock v{latest_version} 已发布")
+            }
+        });
     let prompt_body = prompt_obj
         .and_then(|p| Some(sanitize_plain_text(p.get("body"))))
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| {
-            format!("当前版本 v{current}，最新版本 v{latest_version}，可前往 HaoAn Lab 官网更新。")
+            if crate::i18n::is_en() {
+                format!("Current version: v{current}, latest version: v{latest_version}. Visit HaoAn Lab to update.")
+            } else {
+                format!("当前版本 v{current}，最新版本 v{latest_version}，可前往 HaoAn Lab 官网更新。")
+            }
         });
     let prompt_button = prompt_obj
         .and_then(|p| Some(sanitize_plain_text(p.get("button"))))
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "立即更新".to_string());
+        .unwrap_or_else(|| crate::i18n::tr("立即更新", "Update Now").to_string());
 
     let available = payload
         .get("available")
         .and_then(|v| v.as_bool())
         .unwrap_or(has_update);
     let message = if has_update {
-        format!("发现新版本 v{latest_version}")
+        if crate::i18n::is_en() {
+            format!("New version v{latest_version} available")
+        } else {
+            format!("发现新版本 v{latest_version}")
+        }
+    } else if crate::i18n::is_en() {
+        format!("Up to date (v{current})")
     } else {
         format!("已是最新版本 (v{current})")
     };

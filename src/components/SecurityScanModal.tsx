@@ -1,5 +1,6 @@
 import { AlertTriangle, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { localizeSecurityFinding, useI18n } from "../lib/i18n";
 import type { SecurityScanReport } from "../types/ipc";
 
 interface SecurityScanModalProps {
@@ -23,6 +24,7 @@ export function SecurityScanModal({
   onCancel,
   onConfirmInstall,
 }: SecurityScanModalProps) {
+  const { isEn, t } = useI18n();
   const highRisk = Boolean(report?.blocked || report?.riskLevel === "high");
   const blocked = highRisk && !allowConfirmHighRisk;
 
@@ -58,10 +60,10 @@ export function SecurityScanModal({
                 )}
                 <h2 className="text-[14.5px] font-bold text-[var(--text-primary)]">
                   {blocked
-                    ? "安全筛查未通过（已拦截）"
+                    ? t("安全筛查未通过（已拦截）", "Security Check Failed (Blocked)")
                     : highRisk
-                      ? "官方人工复核放行提醒"
-                      : "安装前安全提醒"}
+                      ? t("官方人工复核放行提醒", "Official Reviewed Plugin Notice")
+                      : t("安装前安全提醒", "Pre-Install Security Notice")}
                 </h2>
               </div>
               <button
@@ -69,7 +71,7 @@ export function SecurityScanModal({
                 disabled={busy}
                 onClick={onCancel}
                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                aria-label="关闭"
+                aria-label={t("关闭", "Close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -90,7 +92,9 @@ export function SecurityScanModal({
 
               {report.externalDomains.length > 0 && (
                 <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-[12px]">
-                  <div className="font-medium text-[var(--text-primary)]">检测到的外部连接网址：</div>
+                  <div className="font-medium text-[var(--text-primary)]">
+                    {t("检测到的外部连接网址：", "Detected external hosts:")}
+                  </div>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {report.externalDomains.map((domain) => (
                       <span
@@ -105,37 +109,44 @@ export function SecurityScanModal({
               )}
 
               <div className="space-y-2">
-                {report.findings.map((f, idx) => (
-                  <div
-                    key={`${f.code}-${f.file}-${idx}`}
-                    className="rounded-xl border border-[var(--border-hairline)] px-3.5 py-2.5 text-[12px]"
-                    style={{
-                      backgroundColor: f.severity === "high" ? "var(--danger-bg)" : "var(--warn-bg)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className="font-semibold"
-                        style={{ color: f.severity === "high" ? "var(--danger)" : "var(--warn)" }}
-                      >
-                        {f.severity === "high" ? "高危拦截 · " : "敏感行为 · "}
-                        {f.title}
-                      </span>
-                      {f.file && (
-                        <span className="truncate font-mono-code text-[11px] text-[var(--text-muted)]">
-                          {f.file}
+                {report.findings.map((f, idx) => {
+                  const localized = localizeSecurityFinding(f, isEn);
+                  return (
+                    <div
+                      key={`${f.code}-${f.file}-${idx}`}
+                      className="rounded-xl border border-[var(--border-hairline)] px-3.5 py-2.5 text-[12px]"
+                      style={{
+                        backgroundColor: f.severity === "high" ? "var(--danger-bg)" : "var(--warn-bg)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="font-semibold"
+                          style={{ color: f.severity === "high" ? "var(--danger)" : "var(--warn)" }}
+                        >
+                          {f.severity === "high"
+                            ? t("高危拦截 · ", "High Risk · ")
+                            : t("敏感行为 · ", "Sensitive · ")}
+                          {localized.title}
                         </span>
-                      )}
+                        {f.file && (
+                          <span className="truncate font-mono-code text-[11px] text-[var(--text-muted)]">
+                            {f.file}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 leading-relaxed text-[var(--text-primary)]">
+                        {localized.detail}
+                      </p>
                     </div>
-                    <p className="mt-1 leading-relaxed text-[var(--text-primary)]">{f.detail}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-hairline)] px-5 py-3">
               <button type="button" disabled={busy} onClick={onCancel} className="agy-btn px-3.5 py-1.5 text-[12.5px]">
-                {blocked ? "关闭" : "取消安装"}
+                {blocked ? t("关闭", "Close") : t("取消安装", "Cancel")}
               </button>
               {!blocked && onConfirmInstall && (
                 <button
@@ -144,7 +155,7 @@ export function SecurityScanModal({
                   onClick={onConfirmInstall}
                   className="agy-btn-primary px-3.5 py-1.5 text-[12.5px]"
                 >
-                  {busy ? "安装中..." : "已知晓风险，继续安装"}
+                  {busy ? t("安装中...", "Installing...") : t("已知晓风险，继续安装", "Install Anyway")}
                 </button>
               )}
             </div>

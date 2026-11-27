@@ -88,6 +88,8 @@ pub struct UiPreferences {
     #[serde(default = "default_true")]
     pub minimize_to_tray: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shortcuts_initialized: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_create_shortcuts_on_startup: Option<bool>,
@@ -98,6 +100,7 @@ impl Default for UiPreferences {
         Self {
             theme: "auto".to_string(),
             minimize_to_tray: true,
+            language: None,
             shortcuts_initialized: None,
             auto_create_shortcuts_on_startup: None,
         }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FolderSearch, Shield } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatBytes, formatCompactBytes } from "../lib/format";
+import { tr, useI18n } from "../lib/i18n";
 import type { StorageNode, StorageScanProgress } from "../types/ipc";
 
 interface Rect {
@@ -172,16 +173,19 @@ function prepareChildren(node: StorageNode, availW: number, availH: number, maxI
     const aggCount = tail.reduce((s, t) => s + t.fileCount, 0);
     visible.push({
       nodeId: `__agg__:${node.nodeId}`,
-      name: `其余 ${tail.length} 项`,
+      name: tr(`其余 ${tail.length} 项`, `${tail.length} other items`),
       kind: "aggregate",
       category: node.category,
       sizeBytes: aggSize,
       fileCount: aggCount,
       path: node.path,
-      subtitle: `双击钻取查看剩余 ${tail.length} 个较小条目`,
-      purposeDesc: `此处折叠了 ${tail.length} 个占用空间较小的条目，双击即可展开逐项查看与清理。`,
+      subtitle: tr(`双击钻取查看剩余 ${tail.length} 个较小条目`, `Double-click to inspect ${tail.length} smaller items`),
+      purposeDesc: tr(
+        `此处折叠了 ${tail.length} 个占用空间较小的条目，双击即可展开逐项查看与清理。`,
+        `${tail.length} smaller items are grouped here. Double-click to inspect and clean them individually.`,
+      ),
       deletability: "caution",
-      deletabilityLabel: "聚合折叠 · 展开查看",
+      deletabilityLabel: tr("聚合折叠 · 展开查看", "Grouped · Expand to view"),
       protected: false,
       sessionId: "",
       mtime: tail.reduce((m, t) => Math.max(m, t.mtime || 0), 0),
@@ -285,6 +289,7 @@ export function SpaceTreemap({
   onActivateNode,
   onContextMenuNode,
 }: SpaceTreemapProps) {
+  const { lang, t } = useI18n();
   const prefersReduced = useReducedMotion();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 640, h: 420 });
@@ -322,7 +327,7 @@ export function SpaceTreemap({
     const collected: PositionedTile[] = [];
     layoutTreeTiles(rootNode, workRect, 0, collected);
     return collected;
-  }, [rootNode, size.w, size.h]);
+  }, [rootNode, size.w, size.h, lang]);
 
   const skeletonTiles = useMemo(() => {
     const workRect: Rect = {
@@ -560,8 +565,10 @@ export function SpaceTreemap({
                 </div>
                 <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">
                   {scanning
-                    ? projectSource ? "正在扫描项目文件…" : "正在扫描 Antigravity 本地数据…"
-                    : "当前筛选条件下暂无可显示条目"}
+                    ? projectSource
+                      ? t("正在扫描项目文件…", "Scanning project files…")
+                      : t("正在扫描 Antigravity 本地数据…", "Scanning local Antigravity data…")
+                    : t("当前筛选条件下暂无可显示条目", "No items match the current filter")}
                 </div>
                 {scanning ? (
                   <>
@@ -573,13 +580,19 @@ export function SpaceTreemap({
                     </div>
                     <div className="mt-2 truncate font-mono-code text-[11px] tabular-nums text-[var(--text-muted)]">
                       {scanProgress?.rootLabel
-                        ? `${scanProgress.rootLabel} · ${scanProgress.scannedFiles.toLocaleString()} 文件 · ${formatBytes(scanProgress.scannedBytes)}`
-                        : "准备扫描目录..."}
+                        ? t(
+                            `${scanProgress.rootLabel} · ${scanProgress.scannedFiles.toLocaleString()} 文件 · ${formatBytes(scanProgress.scannedBytes)}`,
+                            `${scanProgress.rootLabel} · ${scanProgress.scannedFiles.toLocaleString()} files · ${formatBytes(scanProgress.scannedBytes)}`,
+                          )
+                        : t("准备扫描目录...", "Preparing to scan directories...")}
                     </div>
                   </>
                 ) : (
                   <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-                    可清空搜索关键字，或点击右上角“重新扫描”刷新磁盘数据
+                    {t(
+                      "可清空搜索关键字，或点击右上角“重新扫描”刷新磁盘数据",
+                      "Clear the search query or click Rescan in the top right to refresh disk data",
+                    )}
                   </p>
                 )}
               </div>
@@ -600,7 +613,7 @@ export function SpaceTreemap({
           >
             <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent)]" />
             <span className="text-[11.5px] font-medium tabular-nums text-[var(--text-primary)]">
-              正在重新扫描 ({pctText})
+              {t(`正在重新扫描 (${pctText})`, `Rescanning (${pctText})`)}
             </span>
           </motion.div>
         )}
@@ -621,7 +634,7 @@ export function SpaceTreemap({
           <div className="mt-0.5 flex items-center gap-1.5 font-mono-code text-[10.5px] tabular-nums text-[var(--text-muted)]">
             <span>{formatBytes(hoveredTile.node.sizeBytes)}</span>
             <span>·</span>
-            <span>{hoveredTile.node.fileCount} 个文件</span>
+            <span>{t(`${hoveredTile.node.fileCount} 个文件`, `${hoveredTile.node.fileCount} files`)}</span>
           </div>
           {hoveredTile.node.deletabilityLabel && (
             <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">

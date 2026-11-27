@@ -70,28 +70,30 @@ const RULE_FILENAMES: &[&str] = &[
 const RULE_CONFIG_DIRS: &[&str] = &["skills", "plugins", "sidecars", "rules"];
 
 fn category_label_and_order(cat: &str) -> (&'static str, usize) {
+    let en = crate::i18n::is_en();
     match cat {
-        "session" => ("会话", 1),
-        "conversations" => ("会话记录 (.pb / .db)", 2),
-        "cache" => ("缓存与临时文件", 3),
-        "logs" => ("日志与步骤输出", 4),
-        "images" => ("图片文件", 5),
-        "videos" => ("视频文件", 6),
-        "audio" => ("音频文件", 7),
-        "docs" => ("文档与报告", 8),
-        "code" => ("代码与数据", 9),
-        "rules" => ("规则与扩展配置", 10),
-        _ => ("其他文件", 11),
+        "session" => (if en { "Sessions" } else { "会话" }, 1),
+        "conversations" => (if en { "Conversation Logs (.pb / .db)" } else { "会话记录 (.pb / .db)" }, 2),
+        "cache" => (if en { "Cache & Temp Files" } else { "缓存与临时文件" }, 3),
+        "logs" => (if en { "Logs & Step Output" } else { "日志与步骤输出" }, 4),
+        "images" => (if en { "Images" } else { "图片文件" }, 5),
+        "videos" => (if en { "Videos" } else { "视频文件" }, 6),
+        "audio" => (if en { "Audio" } else { "音频文件" }, 7),
+        "docs" => (if en { "Documents & Reports" } else { "文档与报告" }, 8),
+        "code" => (if en { "Code & Data" } else { "代码与数据" }, 9),
+        "rules" => (if en { "Rules & Extension Config" } else { "规则与扩展配置" }, 10),
+        _ => (if en { "Other Files" } else { "其他文件" }, 11),
     }
 }
 
 fn subrole_label(subrole: &str) -> Option<&'static str> {
+    let en = crate::i18n::is_en();
     match subrole {
-        "system_generated" => Some(".system_generated (日志与步骤)"),
-        "user_uploaded" => Some(".user_uploaded (上传媒体)"),
-        "temp_media" => Some(".tempmediaStorage (临时媒体)"),
-        "scratch" => Some("scratch (临时工作区)"),
-        "artifacts" => Some("制品与文档"),
+        "system_generated" => Some(if en { ".system_generated (Logs & Steps)" } else { ".system_generated (日志与步骤)" }),
+        "user_uploaded" => Some(if en { ".user_uploaded (Uploaded Media)" } else { ".user_uploaded (上传媒体)" }),
+        "temp_media" => Some(if en { ".tempmediaStorage (Temp Media)" } else { ".tempmediaStorage (临时媒体)" }),
+        "scratch" => Some(if en { "scratch (Temp Workspace)" } else { "scratch (临时工作区)" }),
+        "artifacts" => Some(if en { "Artifacts & Docs" } else { "制品与文档" }),
         _ => None,
     }
 }
@@ -896,6 +898,7 @@ where
 }
 
 fn describe_storage_purpose(node: &StorageNode, session_subrole: &str) -> (String, String, String) {
+    let tr = crate::i18n::tr;
     let lower_name = node.name.to_lowercase();
     let lower_path = node.path.to_lowercase();
     let kind = node.kind.as_str();
@@ -903,107 +906,150 @@ fn describe_storage_purpose(node: &StorageNode, session_subrole: &str) -> (Strin
 
     if kind == "root" {
         return (
-            "Antigravity 与 AGY 插件在本地存储的数据总览；包含各会话产出、对话历史、图片媒体与运行缓存。".into(),
+            tr(
+                "Antigravity 与 AGY 插件在本地存储的数据总览；包含各会话产出、对话历史、图片媒体与运行缓存。",
+                "Overview of local Antigravity and AGY plugin data, including session outputs, chat history, media, and runtime caches.",
+            ).into(),
             "caution".into(),
-            "按分类查看".into(),
+            tr("按分类查看", "View by Category").into(),
         );
     }
     if kind == "aggregate" {
         return (
             if node.purpose_desc.is_empty() {
-                "此处折叠了多个占用空间较小的条目，双击即可展开逐项查看与清理。".into()
+                tr(
+                    "此处折叠了多个占用空间较小的条目，双击即可展开逐项查看与清理。",
+                    "Smaller entries are grouped here. Double-click to expand, inspect, or clean them individually.",
+                ).into()
             } else {
                 node.purpose_desc.clone()
             },
             "caution".into(),
-            "聚合折叠 · 展开查看".into(),
+            tr("聚合折叠 · 展开查看", "Grouped · Expand to View").into(),
         );
     }
     if node.is_protected || cat == "rules" {
+        let protected_lbl = tr("受保护配置", "Protected Config").to_string();
         if lower_path.contains("\\skills\\") || lower_name == "skills" {
             return (
-                "已安装的 AI 技能 (Skills) 与规则指令文件，删除将导致对应技能失效。".into(),
+                tr(
+                    "已安装的 AI 技能 (Skills) 与规则指令文件，删除将导致对应技能失效。",
+                    "Installed AI Skills and instruction files. Deleting them will disable those skills.",
+                ).into(),
                 "protected".into(),
-                "受保护配置".into(),
+                protected_lbl,
             );
         }
         if lower_path.contains("\\plugins\\") || lower_name == "plugins" {
             return (
-                "Antigravity 原生插件及配置目录，包含已挂载的扩展核心文件。".into(),
+                tr(
+                    "Antigravity 原生插件及配置目录，包含已挂载的扩展核心文件。",
+                    "Antigravity native extensions and config folder containing core extension files.",
+                ).into(),
                 "protected".into(),
-                "受保护配置".into(),
+                protected_lbl,
             );
         }
         if lower_name == "agents.md" || lower_name == "gemini.md" {
             return (
-                "全局 Agent 行为规范文档 (AGENTS.md / GEMINI.md)，建议长期保留。".into(),
+                tr(
+                    "全局 Agent 行为规范文档 (AGENTS.md / GEMINI.md)，建议长期保留。",
+                    "Global Agent rules file (AGENTS.md / GEMINI.md). Recommended to keep.",
+                ).into(),
                 "protected".into(),
-                "受保护配置".into(),
+                protected_lbl,
             );
         }
         if lower_name.contains("mcp_config") || lower_name == "config.json" {
             return (
-                "MCP 工具服务与环境核心配置，删除后需重新配置插件。".into(),
+                tr(
+                    "MCP 工具服务与环境核心配置，删除后需重新配置插件。",
+                    "Core MCP server and environment config. Deleting requires reconfiguring extensions.",
+                ).into(),
                 "protected".into(),
-                "受保护配置".into(),
+                protected_lbl,
             );
         }
         return (
-            "规则、技能或扩展核心配置文件，误删会影响 Antigravity 功能正常运行。".into(),
+            tr(
+                "规则、技能或扩展核心配置文件，误删会影响 Antigravity 功能正常运行。",
+                "Core rules, skills, or extension config files. Accidental deletion may break Antigravity features.",
+            ).into(),
             "protected".into(),
-            "受保护配置".into(),
+            protected_lbl,
         );
     }
 
     if kind == "session" {
         return (
-            "单个完整对话会话：包含产出文档/截图、日志以及主对话记录；可选择“仅清理产出文件”或“删除整个会话”。".into(),
+            tr(
+                "单个完整对话会话：包含产出文档/截图、日志以及主对话记录；可选择“仅清理产出文件”或“删除整个会话”。",
+                "Complete conversation session including outputs/screenshots, logs, and chat history. Choose to delete outputs only or the entire session.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if kind == "session_files" {
         return (
-            "该会话产生的工作区产物（报告、截图、临时脚本及执行日志），清理后仍保留对话文本历史。".into(),
+            tr(
+                "该会话产生的工作区产物（报告、截图、临时脚本及执行日志），清理后仍保留对话文本历史。",
+                "Workspace outputs generated by this session (reports, screenshots, scratch scripts, logs). Cleaning keeps text chat history.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if kind == "session_pb" {
         return (
-            "该会话的核心对话记录库（.pb / .pbtxt / 索引文件）；单独保留可作为纯文本回溯，删除整个会话时将一并移除。".into(),
+            tr(
+                "该会话的核心对话记录库（.pb / .pbtxt / 索引文件）；单独保留可作为纯文本回溯，删除整个会话时将一并移除。",
+                "Core conversation database (.pb / .pbtxt / index) for this session. Removed together when deleting the full session.",
+            ).into(),
             "caution".into(),
-            "建议随会话清理".into(),
+            tr("建议随会话清理", "Clean with Session").into(),
         );
     }
 
     match session_subrole {
         "system_generated" => {
             return (
-                "会话自动生成的步骤日志与中间状态快照 (.system_generated)，历史会话通常可放心清理。".into(),
+                tr(
+                    "会话自动生成的步骤日志与中间状态快照 (.system_generated)，历史会话通常可放心清理。",
+                    "Auto-generated step logs and state snapshots (.system_generated). Generally safe to clean for older sessions.",
+                ).into(),
                 "safe".into(),
-                "可安全清理".into(),
+                tr("可安全清理", "Safe to Clean").into(),
             )
         }
         "temp_media" => {
             return (
-                "粘贴或预览图产生的临时媒体缓存 (.tempmediaStorage)，可直接安全清理。".into(),
+                tr(
+                    "粘贴或预览图产生的临时媒体缓存 (.tempmediaStorage)，可直接安全清理。",
+                    "Temporary media cache from pasted or previewed images (.tempmediaStorage). Safe to clean.",
+                ).into(),
                 "safe".into(),
-                "可安全清理".into(),
+                tr("可安全清理", "Safe to Clean").into(),
             )
         }
         "scratch" => {
             return (
-                "会话执行过程中创建的临时脚本与草稿目录 (scratch)，可直接安全清理。".into(),
+                tr(
+                    "会话执行过程中创建的临时脚本与草稿目录 (scratch)，可直接安全清理。",
+                    "Temporary scripts and draft files created during a session (scratch). Safe to clean.",
+                ).into(),
                 "safe".into(),
-                "可安全清理".into(),
+                tr("可安全清理", "Safe to Clean").into(),
             )
         }
         "user_uploaded" => {
             return (
-                "对话中手动上传的图片或附件 (.user_uploaded)，确认无需回顾后再行删除。".into(),
+                tr(
+                    "对话中手动上传的图片或附件 (.user_uploaded)，确认无需回顾后再行删除。",
+                    "Images or attachments uploaded in chat (.user_uploaded). Confirm you no longer need them before deleting.",
+                ).into(),
                 "caution".into(),
-                "谨慎清理".into(),
+                tr("谨慎清理", "Review Before Cleaning").into(),
             )
         }
         _ => {}
@@ -1013,23 +1059,32 @@ fn describe_storage_purpose(node: &StorageNode, session_subrole: &str) -> (Strin
         || lower_path.ends_with("conversation_summaries.db")
     {
         return (
-            "Antigravity 会话摘要总索引数据库，删除将丢失所有历史会话标题列表，请勿直接删除。".into(),
+            tr(
+                "Antigravity 会话摘要总索引数据库，删除将丢失所有历史会话标题列表，请勿直接删除。",
+                "Antigravity master session summary index database. Deleting loses all session titles—do not delete directly.",
+            ).into(),
             "protected".into(),
-            "核心索引 · 勿删".into(),
+            tr("核心索引 · 勿删", "Core Index · Do Not Delete").into(),
         );
     }
     if lower_name.ends_with(".pb") && lower_path.contains("\\conversations\\") {
         return (
-            "Antigravity 单条对话完整记录 (.pb)，删除该文件后对应会话历史将消失。".into(),
+            tr(
+                "Antigravity 单条对话完整记录 (.pb)，删除该文件后对应会话历史将消失。",
+                "Full Antigravity conversation record (.pb). Deleting this removes the session's chat history.",
+            ).into(),
             "caution".into(),
-            "谨慎清理".into(),
+            tr("谨慎清理", "Review Before Cleaning").into(),
         );
     }
     if lower_name.ends_with(".pbtxt") && lower_path.contains("\\annotations\\") {
         return (
-            "会话元信息标注文件 (.pbtxt)，记录对话标题、归档状态与最近查看时间。".into(),
+            tr(
+                "会话元信息标注文件 (.pbtxt)，记录对话标题、归档状态与最近查看时间。",
+                "Session metadata annotation (.pbtxt) storing title, archive status, and last viewed time.",
+            ).into(),
             "caution".into(),
-            "谨慎清理".into(),
+            tr("谨慎清理", "Review Before Cleaning").into(),
         );
     }
     if cat == "cache"
@@ -1041,9 +1096,12 @@ fn describe_storage_purpose(node: &StorageNode, session_subrole: &str) -> (Strin
         || lower_path.contains("cacheddata")
     {
         return (
-            "应用或浏览器内核生成的本地缓存 / GPU 着色器缓存 / 临时文件，清理后软件会自动重建。".into(),
+            tr(
+                "应用或浏览器内核生成的本地缓存 / GPU 着色器缓存 / 临时文件，清理后软件会自动重建。",
+                "App/browser cache, GPU shader cache, or temp files. Automatically rebuilt when needed.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if cat == "logs"
@@ -1052,50 +1110,71 @@ fn describe_storage_purpose(node: &StorageNode, session_subrole: &str) -> (Strin
         || lower_name.ends_with(".jsonl")
     {
         return (
-            "客户端或会话运行诊断日志与过程追踪记录，清理不会影响已生成的制品或配置。".into(),
+            tr(
+                "客户端或会话运行诊断日志与过程追踪记录，清理不会影响已生成的制品或配置。",
+                "Diagnostic logs and execution traces. Cleaning does not affect artifacts or configs.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if cat == "images" {
         return (
-            "对话中生成的截图、界面对比图或用户上传图片；确认不需要后可清理释放空间。".into(),
+            tr(
+                "对话中生成的截图、界面对比图或用户上传图片；确认不需要后可清理释放空间。",
+                "Screenshots, visual diffs, or uploaded images from chats. Safe to clean when no longer needed.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if cat == "videos" || cat == "audio" {
         return (
-            "录屏演示、浏览器录制视频或语音音频媒体文件，通常占用体积较大，确认无需保存后可清理。".into(),
+            tr(
+                "录屏演示、浏览器录制视频或语音音频媒体文件，通常占用体积较大，确认无需保存后可清理。",
+                "Screen recordings, browser videos, or audio files. Often large—clean when no longer needed.",
+            ).into(),
             "safe".into(),
-            "可安全清理".into(),
+            tr("可安全清理", "Safe to Clean").into(),
         );
     }
     if cat == "docs" {
         return (
-            "会话生成的计划报告、文档或 Office/PDF 导出品，建议确认重要结论已保存后再清理。".into(),
+            tr(
+                "会话生成的计划报告、文档或 Office/PDF 导出品，建议确认重要结论已保存后再清理。",
+                "Session reports, documents, or Office/PDF exports. Confirm important content is saved before cleaning.",
+            ).into(),
             "caution".into(),
-            "谨慎清理".into(),
+            tr("谨慎清理", "Review Before Cleaning").into(),
         );
     }
     if cat == "code" {
         return (
-            "会话过程中写入的数据文件、JSON 配置或脚本片段。".into(),
+            tr(
+                "会话过程中写入的数据文件、JSON 配置或脚本片段。",
+                "Data files, JSON configs, or scripts created during sessions.",
+            ).into(),
             "caution".into(),
-            "谨慎清理".into(),
+            tr("谨慎清理", "Review Before Cleaning").into(),
         );
     }
     if cat == "conversations" {
         return (
-            "会话持久化对话历史数据库或消息流文件，删除后对应会话记录将不可恢复。".into(),
+            tr(
+                "会话持久化对话历史数据库或消息流文件，删除后对应会话记录将不可恢复。",
+                "Persistent chat history database or message stream. Deleting permanently removes that session's history.",
+            ).into(),
             "caution".into(),
-            "谨慎清理".into(),
+            tr("谨慎清理", "Review Before Cleaning").into(),
         );
     }
     (
-        "Antigravity 本地数据存储目录或常规辅助文件，清理前建议确认是否仍需使用。".into(),
+        tr(
+            "Antigravity 本地数据存储目录或常规辅助文件，清理前建议确认是否仍需使用。",
+            "Local Antigravity data folder or helper file. Confirm whether it's still needed before cleaning.",
+        ).into(),
         "caution".into(),
-        "谨慎清理".into(),
+        tr("谨慎清理", "Review Before Cleaning").into(),
     )
 }
 
@@ -1120,7 +1199,8 @@ fn format_session_display_name(sid: &str, sessions: &HashMap<String, SessionMeta
             return meta.title.trim().to_string();
         }
     }
-    format!("未命名会话 · {}", &key[..8.min(key.len())])
+    let prefix = crate::i18n::tr("未命名会话", "Unnamed Session");
+    format!("{prefix} · {}", &key[..8.min(key.len())])
 }
 
 fn resolve_file_display_name(
@@ -1248,7 +1328,11 @@ fn build_nested_dir_children(
             size_bytes,
             file_count,
             path: dir_path.to_string_lossy().into_owned(),
-            subtitle: format!("{file_count} 项"),
+            subtitle: if crate::i18n::is_en() {
+                format!("{file_count} items")
+            } else {
+                format!("{file_count} 项")
+            },
             is_protected: prot,
             session_id: if is_uuid { dir_name.to_lowercase() } else { String::new() },
             mtime,
@@ -1318,7 +1402,8 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
         }
         let is_unnamed = title.is_empty();
         if title.is_empty() {
-            title = format!("未命名会话 · {}", &sid[..8.min(sid.len())]);
+            let prefix = crate::i18n::tr("未命名会话", "Unnamed Session");
+            title = format!("{prefix} · {}", &sid[..8.min(sid.len())]);
         }
 
         let mut brain_recs: Vec<&FileRecord> = Vec::new();
@@ -1395,7 +1480,11 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
                     size_bytes: sz,
                     file_count: role_recs.len() as u64,
                     path: role_dir.to_string_lossy().into_owned(),
-                    subtitle: format!("{} 个文件", role_recs.len()),
+                    subtitle: if crate::i18n::is_en() {
+                        format!("{} files", role_recs.len())
+                    } else {
+                        format!("{} 个文件", role_recs.len())
+                    },
                     session_id: sid.clone(),
                     mtime: role_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max),
                     delete_targets: targets,
@@ -1407,13 +1496,16 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
             let b_size: u64 = brain_recs.iter().map(|r| r.size_bytes).sum();
             let b_node = StorageNode {
                 node_id: format!("sess:{sid}:files"),
-                name: "会话产出文件 (brain)".to_string(),
+                name: crate::i18n::tr("会话产出文件 (brain)", "Session Outputs (brain)").to_string(),
                 kind: "session_files".to_string(),
                 category: "docs".to_string(),
                 size_bytes: b_size,
                 file_count: brain_recs.len() as u64,
                 path: brain_dir.clone(),
-                subtitle: "清理后保留对话记录与标题".to_string(),
+                subtitle: crate::i18n::tr(
+                    "清理后保留对话记录与标题",
+                    "Keeps chat history and title after cleaning",
+                ).to_string(),
                 session_id: sid.clone(),
                 mtime: brain_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max),
                 delete_targets: vec![brain_dir.clone()],
@@ -1442,13 +1534,20 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
                 .unwrap_or_default();
             let m_node = StorageNode {
                 node_id: format!("sess:{sid}:pb"),
-                name: "对话记录与索引 (.pb / .db / .pbtxt)".to_string(),
+                name: crate::i18n::tr(
+                    "对话记录与索引 (.pb / .db / .pbtxt)",
+                    "Chat History & Index (.pb / .db / .pbtxt)",
+                ).to_string(),
                 kind: "session_pb".to_string(),
                 category: "conversations".to_string(),
                 size_bytes: m_size,
                 file_count: meta_recs.len() as u64,
                 path: primary_path,
-                subtitle: format!("{} 个记录文件", meta_recs.len()),
+                subtitle: if crate::i18n::is_en() {
+                    format!("{} record files", meta_recs.len())
+                } else {
+                    format!("{} 个记录文件", meta_recs.len())
+                },
                 session_id: sid.clone(),
                 mtime: meta_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max),
                 delete_targets: pb_targets,
@@ -1475,10 +1574,10 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
         }
         sub_bits.push(sid[..8.min(sid.len())].to_string());
         if archived {
-            sub_bits.push("已归档".to_string());
+            sub_bits.push(crate::i18n::tr("已归档", "Archived").to_string());
         }
         if is_subagent {
-            sub_bits.push("子代理会话".to_string());
+            sub_bits.push(crate::i18n::tr("子代理会话", "Subagent").to_string());
         }
 
         // Prefer explicit DB/pbtxt view time over SQLite -shm/-wal sidecar mtime
@@ -1555,7 +1654,10 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
         let sh_mtime = shared_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max);
         let sh_node = StorageNode {
             node_id: "shared:antigravity".to_string(),
-            name: "全局共享数据 (索引 / 知识库 / 缓存)".to_string(),
+            name: crate::i18n::tr(
+                "全局共享数据 (索引 / 知识库 / 缓存)",
+                "Shared Global Data (Index / Knowledge / Cache)",
+            ).to_string(),
             kind: "category".to_string(),
             category: "cache".to_string(),
             size_bytes: sh_size,
@@ -1565,7 +1667,11 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
                 .first()
                 .map(|r| r.path.to_string_lossy().into_owned())
                 .unwrap_or_default(),
-            subtitle: format!("{} 个文件", shared_recs.len()),
+            subtitle: if crate::i18n::is_en() {
+                format!("{} files", shared_recs.len())
+            } else {
+                format!("{} 个文件", shared_recs.len())
+            },
             mtime: sh_mtime,
             children: sub_dirs,
             ..Default::default()
@@ -1586,13 +1692,16 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
         let cfg_mtime = config_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max);
         let cfg_node = StorageNode {
             node_id: "cfg:root".to_string(),
-            name: "规则与扩展配置 (.gemini/config · 受保护)".to_string(),
+            name: crate::i18n::tr(
+                "规则与扩展配置 (.gemini/config · 受保护)",
+                "Rules & Extensions Config (.gemini/config · Protected)",
+            ).to_string(),
             kind: "category".to_string(),
             category: "rules".to_string(),
             size_bytes: cfg_size,
             file_count: config_recs.len() as u64,
             path: root_path.to_string_lossy().into_owned(),
-            subtitle: "受保护 · 建议保留".to_string(),
+            subtitle: crate::i18n::tr("受保护 · 建议保留", "Protected · Recommended to Keep").to_string(),
             is_protected: true,
             mtime: cfg_mtime,
             children: c_children,
@@ -1614,13 +1723,20 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
         let a_mtime = appdata_recs.iter().map(|r| r.mtime).fold(0.0_f64, f64::max);
         let a_node = StorageNode {
             node_id: "appdata:root".to_string(),
-            name: "应用运行缓存 (%APPDATA%/Antigravity)".to_string(),
+            name: crate::i18n::tr(
+                "应用运行缓存 (%APPDATA%/Antigravity)",
+                "App Runtime Cache (%APPDATA%/Antigravity)",
+            ).to_string(),
             kind: "category".to_string(),
             category: "cache".to_string(),
             size_bytes: a_size,
             file_count: appdata_recs.len() as u64,
             path: root_path.to_string_lossy().into_owned(),
-            subtitle: format!("{} 个文件", appdata_recs.len()),
+            subtitle: if crate::i18n::is_en() {
+                format!("{} files", appdata_recs.len())
+            } else {
+                format!("{} 个文件", appdata_recs.len())
+            },
             mtime: a_mtime,
             children: a_children,
             ..Default::default()
@@ -1635,7 +1751,7 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
 
     let root_node = StorageNode {
         node_id: "root:session".to_string(),
-        name: "Antigravity 本地存储".to_string(),
+        name: crate::i18n::tr("Antigravity 本地存储", "Antigravity Local Storage").to_string(),
         kind: "root".to_string(),
         category: "session".to_string(),
         size_bytes: total_bytes,
@@ -1645,7 +1761,11 @@ fn build_session_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> 
             .first()
             .map(|r| r.path.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        subtitle: format!("{} 个项目 · {} 个文件", top_children.len(), total_files),
+        subtitle: if crate::i18n::is_en() {
+            format!("{} items · {} files", top_children.len(), total_files)
+        } else {
+            format!("{} 个项目 · {} 个文件", top_children.len(), total_files)
+        },
         mtime: total_mtime,
         children: top_children,
         ..Default::default()
@@ -1666,7 +1786,11 @@ fn build_type_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> Sto
     let mut cat_nodes: Vec<StorageNode> = Vec::new();
     for (ftype, mut recs) in by_type {
         let (label, _) = category_label_and_order(&ftype);
-        let label = if project && ftype == "conversations" { "数据库与数据文件" } else { label };
+        let label = if project && ftype == "conversations" {
+            crate::i18n::tr("数据库与数据文件", "Databases & Data Files")
+        } else {
+            label
+        };
         recs.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
 
         let mut dir_groups: HashMap<String, Vec<&FileRecord>> = HashMap::new();
@@ -1729,7 +1853,11 @@ fn build_type_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> Sto
                         size_bytes: sz,
                         file_count: sub_recs.len() as u64,
                         path: dir_str,
-                        subtitle: format!("{} 个同目录文件", sub_recs.len()),
+                        subtitle: if crate::i18n::is_en() {
+                            format!("{} files in folder", sub_recs.len())
+                        } else {
+                            format!("{} 个同目录文件", sub_recs.len())
+                        },
                         is_protected: prot,
                         session_id: if is_uuid { raw_dir_name.to_lowercase() } else { String::new() },
                         mtime: mt,
@@ -1763,7 +1891,11 @@ fn build_type_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> Sto
                 .parent()
                 .map(|p| p.to_string_lossy().into_owned())
                 .unwrap_or_default(),
-            subtitle: format!("{} 个文件", recs.len()),
+            subtitle: if crate::i18n::is_en() {
+                format!("{} files", recs.len())
+            } else {
+                format!("{} 个文件", recs.len())
+            },
             is_protected: prot,
             mtime: mt,
             delete_targets: targets,
@@ -1780,12 +1912,16 @@ fn build_type_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -> Sto
 
     let root = StorageNode {
         node_id: "root:type".to_string(),
-        name: "按文件类型分布".to_string(),
+        name: crate::i18n::tr("按文件类型分布", "By File Type").to_string(),
         kind: "root".to_string(),
         category: "other".to_string(),
         size_bytes: total_bytes,
         file_count: total_files,
-        subtitle: format!("{} 个类型分组 · {} 个文件", cat_nodes.len(), total_files),
+        subtitle: if crate::i18n::is_en() {
+            format!("{} types · {} files", cat_nodes.len(), total_files)
+        } else {
+            format!("{} 个类型分组 · {} 个文件", cat_nodes.len(), total_files)
+        },
         mtime: total_mtime,
         children: cat_nodes,
         ..Default::default()
@@ -1850,12 +1986,16 @@ fn build_directory_view(snapshot: &StorageScanSnapshot, include_appdata: bool) -
 
     let root = StorageNode {
         node_id: "root:dir".to_string(),
-        name: "按目录结构分布".to_string(),
+        name: crate::i18n::tr("按目录结构分布", "By Directory").to_string(),
         kind: "root".to_string(),
         category: "other".to_string(),
         size_bytes: total_bytes,
         file_count: total_files,
-        subtitle: format!("{} 个根目录 · {} 个文件", root_nodes.len(), total_files),
+        subtitle: if crate::i18n::is_en() {
+            format!("{} roots · {} files", root_nodes.len(), total_files)
+        } else {
+            format!("{} 个根目录 · {} 个文件", root_nodes.len(), total_files)
+        },
         mtime: total_mtime,
         children: root_nodes,
         ..Default::default()
@@ -1885,7 +2025,11 @@ fn build_project_directory_view(snapshot: &StorageScanSnapshot, root: &StorageRo
             size_bytes: children.iter().map(|child| child.size_bytes).sum(),
             file_count,
             path: path_text.clone(),
-            subtitle: format!("{file_count} 个文件"),
+            subtitle: if crate::i18n::is_en() {
+                format!("{file_count} files")
+            } else {
+                format!("{file_count} 个文件")
+            },
             mtime: *mtime,
             delete_targets: vec![path_text],
             children,
@@ -1914,12 +2058,24 @@ fn build_project_directory_view(snapshot: &StorageScanSnapshot, root: &StorageRo
 fn describe_project_node(node: &mut StorageNode) {
     let is_root = node.kind == "root";
     node.purpose_desc = if is_root {
-        "所选项目文件夹中扫描到的文件和子目录。"
+        crate::i18n::tr(
+            "所选项目文件夹中扫描到的文件和子目录。",
+            "Files and subfolders scanned in the selected project folder.",
+        )
     } else {
-        "用户项目中的文件或目录，清理前请确认内容。"
-    }.to_string();
+        crate::i18n::tr(
+            "用户项目中的文件或目录，清理前请确认内容。",
+            "File or folder in a user project. Review contents before deleting.",
+        )
+    }
+    .to_string();
     node.deletability = "caution".to_string();
-    node.deletability_label = if is_root { "项目根目录" } else { "清理前确认" }.to_string();
+    node.deletability_label = if is_root {
+        crate::i18n::tr("项目根目录", "Project Root")
+    } else {
+        crate::i18n::tr("清理前确认", "Confirm Before Cleaning")
+    }
+    .to_string();
     for child in &mut node.children {
         describe_project_node(child);
     }
@@ -2015,13 +2171,13 @@ pub fn build_storage_tree_response(
     } else {
         filter_tree(raw_tree, &q_lower, project.is_some()).unwrap_or_else(|| StorageNode {
             node_id: "root:empty".to_string(),
-            name: "没有匹配搜索条件的存储条目".to_string(),
+            name: crate::i18n::tr("没有匹配搜索条件的存储条目", "No matching storage entries").to_string(),
             kind: "root".to_string(),
             category: "other".to_string(),
-            subtitle: "请尝试调整搜索关键词或切换视图".to_string(),
-            purpose_desc: "当前过滤条件未命中任何文件或会话".to_string(),
+            subtitle: crate::i18n::tr("请尝试调整搜索关键词或切换视图", "Try adjusting your search query or switching views").to_string(),
+            purpose_desc: crate::i18n::tr("当前过滤条件未命中任何文件或会话", "Current filters matched no files or sessions").to_string(),
             deletability: "caution".to_string(),
-            deletability_label: "无匹配".to_string(),
+            deletability_label: crate::i18n::tr("无匹配", "No Match").to_string(),
             ..Default::default()
         })
     };

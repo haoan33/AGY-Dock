@@ -1,5 +1,6 @@
 import { Monitor, Moon, RefreshCw, Rocket, Sun } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { useI18n } from "../lib/i18n";
 import type { ThemeMode } from "../types/ipc";
 import { BrandMark } from "./BrandMark";
 import { MOTION_EASE, MOTION_SPRING } from "./MotionPrimitives";
@@ -19,12 +20,6 @@ export interface NavTabItem {
   count?: number;
   badge?: number;
 }
-
-const THEME_LABELS: Record<ThemeMode, string> = {
-  auto: "自动",
-  light: "浅色",
-  dark: "深色",
-};
 
 interface TopBarProps {
   activeNav: NavTabId;
@@ -51,14 +46,22 @@ export function TopBar({
   themeMode,
   onCycleTheme,
 }: TopBarProps) {
+  const { t } = useI18n();
+
+  const themeLabels: Record<ThemeMode, string> = {
+    auto: t("自动", "Auto"),
+    light: t("浅色", "Light"),
+    dark: t("深色", "Dark"),
+  };
+
   const tabs: NavTabItem[] = [
-    { id: "status", label: "运行状态" },
-    { id: "external", label: "我的插件", count: externalCount },
-    { id: "market", label: "插件市场", count: marketCount, badge: marketBadgeCount },
-    { id: "native", label: "原生管理" },
-    { id: "storage", label: "存储管理" },
-    { id: "logs", label: "日志" },
-    { id: "settings", label: "设置" },
+    { id: "status", label: t("运行状态", "Status") },
+    { id: "external", label: t("我的插件", "Plugins"), count: externalCount },
+    { id: "market", label: t("插件市场", "Market"), count: marketCount, badge: marketBadgeCount },
+    { id: "native", label: t("原生管理", "Native") },
+    { id: "storage", label: t("存储管理", "Storage") },
+    { id: "logs", label: t("日志", "Logs") },
+    { id: "settings", label: t("设置", "Settings") },
   ];
 
   const ThemeIcon = themeMode === "dark" ? Moon : themeMode === "light" ? Sun : Monitor;
@@ -73,7 +76,7 @@ export function TopBar({
       {/* Center Floating Capsule Dock */}
       <LayoutGroup id="topbar-nav">
         <nav
-          aria-label="主导航"
+          aria-label={t("主导航", "Main Navigation")}
           className="flex items-center gap-0.5 rounded-[20px] border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-1 shadow-[var(--shadow-card)]"
         >
           {tabs.map((tab) => {
@@ -112,7 +115,7 @@ export function TopBar({
                 )}
                 {typeof tab.badge === "number" && tab.badge > 0 && (
                   <span
-                    title={`${tab.badge} 项新插件或版本更新`}
+                    title={t(`${tab.badge} 项新插件或版本更新`, `${tab.badge} new plugin(s) or update(s)`)}
                     className="relative z-10 rounded-full px-1.5 py-[1px] text-[10px] leading-tight font-bold tabular-nums text-white"
                     style={{ backgroundColor: "var(--accent)" }}
                   >
@@ -131,7 +134,10 @@ export function TopBar({
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={onCycleTheme}
-          title={`当前外观：${THEME_LABELS[themeMode]}（点击切换 自动 / 浅色 / 深色）`}
+          title={t(
+            `当前外观：${themeLabels[themeMode]}（点击切换 自动 / 浅色 / 深色）`,
+            `Theme: ${themeLabels[themeMode]} (Click to cycle Auto / Light / Dark)`,
+          )}
           className="inline-flex h-[32px] min-w-[70px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2.5 text-[12px] font-medium whitespace-nowrap text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -144,7 +150,7 @@ export function TopBar({
               className="inline-flex items-center gap-1.5 whitespace-nowrap"
             >
               <ThemeIcon className="h-3.5 w-3.5 shrink-0" />
-              <span className="whitespace-nowrap">{THEME_LABELS[themeMode]}</span>
+              <span className="whitespace-nowrap">{themeLabels[themeMode]}</span>
             </motion.span>
           </AnimatePresence>
         </motion.button>
@@ -167,7 +173,7 @@ export function TopBar({
                 className="inline-flex items-center gap-1.5 whitespace-nowrap"
               >
                 <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isBusyAction ? "animate-spin" : ""}`} />
-                <span className="whitespace-nowrap">刷新状态</span>
+                <span className="whitespace-nowrap">{t("刷新状态", "Refresh")}</span>
               </motion.span>
             ) : (
               <motion.span
@@ -179,7 +185,7 @@ export function TopBar({
                 className="inline-flex items-center gap-1.5 whitespace-nowrap"
               >
                 <Rocket className="h-3.5 w-3.5 shrink-0" />
-                <span className="whitespace-nowrap">唤醒 Antigravity</span>
+                <span className="whitespace-nowrap">{t("唤醒 Antigravity", "Wake Antigravity")}</span>
               </motion.span>
             )}
           </AnimatePresence>

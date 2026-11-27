@@ -31,6 +31,7 @@ import {
   formatVersionText,
   sanitizePlainText,
 } from "../lib/format";
+import { localizeSecurityFinding, useI18n } from "../lib/i18n";
 import type {
   CustomMarketplaceRepo,
   RemoteMarketplaceResult,
@@ -77,6 +78,7 @@ export function MarketplacePage({
   onToggleCustomRepo,
   onPreflightThirdParty,
 }: MarketplacePageProps) {
+  const { isEn, t } = useI18n();
   const [tier, setTier] = useState<MarketTierKey>("official");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MarketFilterKey>("all");
@@ -146,13 +148,13 @@ export function MarketplacePage({
   }, [activeTierPlugins, filter, query]);
 
   const tierOptions: Array<SegmentedOption<MarketTierKey>> = [
-    { key: "official", label: "官方市场", count: officialPlugins.length },
-    { key: "third-party", label: "第三方市场", count: thirdPartyPlugins.length },
+    { key: "official", label: t("官方市场", "Official"), count: officialPlugins.length },
+    { key: "third-party", label: t("第三方市场", "Third-Party"), count: thirdPartyPlugins.length },
   ];
 
   const filterOptions: Array<SegmentedOption<MarketFilterKey>> = [
-    { key: "all", label: "全部插件", count: activeTierPlugins.length },
-    { key: "updates", label: "可更新", count: tierUpdateCount },
+    { key: "all", label: t("全部插件", "All"), count: activeTierPlugins.length },
+    { key: "updates", label: t("可更新", "Updates"), count: tierUpdateCount },
   ];
 
   const isSpinning = refreshing || loadingRemote;
@@ -189,7 +191,7 @@ export function MarketplacePage({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3.5">
-      {/* Toolbar (fixed controls across tiers so switching tabs never jumps toolbar height) */}
+      {/* Toolbar */}
       <div className="agy-card flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <SegmentedControl
@@ -200,13 +202,13 @@ export function MarketplacePage({
               setFilter("all");
             }}
             layoutId="marketplace-tier"
-            ariaLabel="切换市场分类"
+            ariaLabel={t("切换市场分类", "Switch marketplace tier")}
           />
 
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="搜索插件名称、作者或描述..."
+            placeholder={t("搜索插件名称、作者或描述...", "Search plugin name, author, or description...")}
             className="w-[220px]"
           />
 
@@ -215,7 +217,7 @@ export function MarketplacePage({
             value={filter}
             onChange={setFilter}
             layoutId="marketplace-filter"
-            ariaLabel="筛选插件状态"
+            ariaLabel={t("筛选插件状态", "Filter plugin status")}
           />
         </div>
 
@@ -224,11 +226,11 @@ export function MarketplacePage({
             type="button"
             disabled={isSpinning}
             onClick={handleRefresh}
-            title="刷新插件市场清单"
+            title={t("刷新插件市场清单", "Refresh marketplace catalog")}
             className="agy-btn"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isSpinning ? "animate-spin" : ""}`} />
-            <span>刷新市场</span>
+            <span>{t("刷新市场", "Refresh")}</span>
           </button>
         </div>
       </div>
@@ -242,12 +244,20 @@ export function MarketplacePage({
           >
             <div
               className="flex min-w-0 flex-1 items-center gap-2"
-              title="第三方市场收录的插件未经官方人工逐行检查，仅做基础代码安全筛查与敏感行为标注；安装或使用第三方插件引起的数据损失或其它后果均由用户自行承担，与本软件作者无关。"
+              title={t(
+                "第三方市场收录的插件未经官方人工逐行检查，仅做基础代码安全筛查与敏感行为标注；安装或使用第三方插件引起的数据损失或其它后果均由用户自行承担，与本软件作者无关。",
+                "Third-party plugins are not manually line-reviewed by maintainers and undergo only automated security checks. Use at your own risk.",
+              )}
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--warn)]" />
               <p className="min-w-0 truncate text-[var(--text-muted)]">
-                <span className="font-semibold text-[var(--text-primary)]">免责声明：</span>
-                第三方插件未经官方人工逐行检查，仅作基础安全筛查，使用后果由用户自负（与软件作者无关）。
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {t("免责声明：", "Disclaimer: ")}
+                </span>
+                {t(
+                  "第三方插件未经官方人工逐行检查，仅作基础安全筛查，使用后果由用户自负（与软件作者无关）。",
+                  "Third-party plugins undergo automated security checks only and are not manually audited. Use at your own risk.",
+                )}
               </p>
             </div>
 
@@ -262,7 +272,7 @@ export function MarketplacePage({
                 className="agy-btn bg-[var(--bg-surface)] px-2.5 py-1 text-[12px]"
               >
                 <Rocket className="h-3.5 w-3.5 text-[var(--accent)]" />
-                <span>快捷上架插件</span>
+                <span>{t("快捷上架插件", "Submit Plugin")}</span>
               </button>
 
               <button
@@ -274,7 +284,7 @@ export function MarketplacePage({
                 className="agy-btn bg-[var(--bg-surface)] px-2.5 py-1 text-[12px]"
               >
                 <FolderGit2 className="h-3.5 w-3.5" />
-                <span>私人仓库 ({customRepos.length})</span>
+                <span>{t(`私人仓库 (${customRepos.length})`, `Private Repos (${customRepos.length})`)}</span>
               </button>
             </div>
           </div>
@@ -285,13 +295,15 @@ export function MarketplacePage({
             <div className="flex flex-wrap items-center gap-2">
               <CloudDownload className="h-4 w-4 shrink-0 text-[var(--accent)]" />
               <h2 className="text-[13.5px] font-semibold text-[var(--text-primary)]">
-                {tier === "official" ? "官方认证插件市场" : "第三方社区与私人仓库"}
+                {tier === "official"
+                  ? t("官方认证插件市场", "Official Verified Marketplace")
+                  : t("第三方社区与私人仓库", "Third-Party Community & Private Repos")}
               </h2>
               {tier === "official" && (
                 <button
                   type="button"
                   onClick={() => onOpenExternalUrl(repoUrl)}
-                  title={`在浏览器打开 ${repoUrl}`}
+                  title={t(`在浏览器打开 ${repoUrl}`, `Open ${repoUrl} in browser`)}
                   className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2 py-[1.5px] font-mono-code text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                 >
                   <span>{repoName}</span>
@@ -302,13 +314,17 @@ export function MarketplacePage({
 
             <div className="flex items-center gap-2">
               {tierUpdateCount > 0 && (
-                <StatusPill tone="warn">{tierUpdateCount} 个可更新</StatusPill>
+                <StatusPill tone="warn">
+                  {t(`${tierUpdateCount} 个可更新`, `${tierUpdateCount} update(s)`)}
+                </StatusPill>
               )}
               {tierNewCount > 0 && (
-                <StatusPill tone="info">{tierNewCount} 个新插件</StatusPill>
+                <StatusPill tone="info">
+                  {t(`${tierNewCount} 个新插件`, `${tierNewCount} new`)}
+                </StatusPill>
               )}
               <span className="text-[11.5px] tabular-nums text-[var(--text-faint)]">
-                {filteredRemote.length} 项
+                {t(`${filteredRemote.length} 项`, `${filteredRemote.length} items`)}
               </span>
               {totalUpdateCount > 0 && (
                 <button
@@ -318,7 +334,7 @@ export function MarketplacePage({
                   className="agy-btn-primary px-3 py-1 text-[12px]"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>{updatingAllRemote ? "更新中..." : "一键全部更新"}</span>
+                  <span>{updatingAllRemote ? t("更新中...", "Updating...") : t("一键全部更新", "Update All")}</span>
                 </button>
               )}
             </div>
@@ -328,7 +344,7 @@ export function MarketplacePage({
             (() => {
               const errorText =
                 sanitizePlainText(remoteMarketplace.message) ||
-                "暂无法连接远程仓库获取插件列表";
+                t("暂无法连接远程仓库获取插件列表", "Unable to reach remote repository to load plugins");
               return (
                 <div className="flex items-center justify-between gap-3 px-5 py-6">
                   <div
@@ -345,7 +361,7 @@ export function MarketplacePage({
                     className="agy-btn shrink-0 px-3 py-1 text-[12px]"
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${loadingRemote ? "animate-spin" : ""}`} />
-                    <span>重试</span>
+                    <span>{t("重试", "Retry")}</span>
                   </button>
                 </div>
               );
@@ -353,17 +369,20 @@ export function MarketplacePage({
           ) : loadingRemote && !remoteMarketplace ? (
             <div className="flex items-center justify-center gap-2 px-5 py-8 text-[12.5px] text-[var(--text-muted)]">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
-              <span>正在同步插件市场与版本更新...</span>
+              <span>{t("正在同步插件市场与版本更新...", "Syncing marketplace catalog and updates...")}</span>
             </div>
           ) : filteredRemote.length === 0 ? (
             <div className="px-5 py-8 text-center text-[12.5px] text-[var(--text-muted)]">
               {query.trim()
-                ? "未找到匹配的插件"
+                ? t("未找到匹配的插件", "No matching plugins found")
                 : filter === "updates"
-                  ? "当前分类下已安装的插件均已是最新版本"
+                  ? t("当前分类下已安装的插件均已是最新版本", "All installed plugins in this category are up to date")
                   : tier === "third-party"
-                    ? "第三方市场暂未收录插件，可点击上方「快捷上架插件」或添加私人仓库"
-                    : "仓库中暂未发现可安装的插件包"}
+                    ? t(
+                        "第三方市场暂未收录插件，可点击上方「快捷上架插件」或添加私人仓库",
+                        "No third-party plugins listed yet. Click Submit Plugin or add a Private Repo above.",
+                      )
+                    : t("仓库中暂未发现可安装的插件包", "No installable plugin packages found in repository")}
             </div>
           ) : (
             <div className="divide-y divide-[var(--border-hairline)] px-2">
@@ -371,9 +390,9 @@ export function MarketplacePage({
                 const isInstalling = installingRemoteId === pkg.id;
                 const busyAny = updatingAllRemote || Boolean(installingRemoteId);
                 const displayName = sanitizePlainText(pkg.name) || pkg.id;
-                const authorName = sanitizePlainText(pkg.author) || "未知";
+                const authorName = sanitizePlainText(pkg.author) || t("未知", "Unknown");
                 const descText =
-                  sanitizePlainText(pkg.description) || `${pkg.id} 远程扩展包`;
+                  sanitizePlainText(pkg.description) || t(`${pkg.id} 远程扩展包`, `${pkg.id} remote plugin package`);
                 const changelogText = pkg.hasUpdate ? pkg.changelog.trim() : "";
                 const hasLowRisk =
                   pkg.riskLevel === "low" && (pkg.riskFindings?.length ?? 0) > 0;
@@ -408,17 +427,18 @@ export function MarketplacePage({
                           </span>
                           {pkg.tier === "custom" && pkg.sourceRepo && (
                             <span className="hidden shrink-0 rounded-md border border-[var(--border-hairline)] px-1.5 py-[1px] font-mono-code text-[10.5px] text-[var(--text-faint)] md:inline">
-                              私人源: {pkg.sourceRepo}
+                              {t("私人源: ", "Private: ")}
+                              {pkg.sourceRepo}
                             </span>
                           )}
                           {hasOfficialHighRisk && (
-                            <StatusPill tone="warn">官方人工复核放行</StatusPill>
+                            <StatusPill tone="warn">{t("官方人工复核放行", "Official Reviewed")}</StatusPill>
                           )}
                           {hasLowRisk && (
-                            <StatusPill tone="warn">低危敏感提醒</StatusPill>
+                            <StatusPill tone="warn">{t("低危敏感提醒", "Low Risk Notice")}</StatusPill>
                           )}
                           {pkg.conflictBlocked && (
-                            <StatusPill tone="danger">ID 冲突已拦截</StatusPill>
+                            <StatusPill tone="danger">{t("ID 冲突已拦截", "ID Conflict Blocked")}</StatusPill>
                           )}
                           {pkg.size > 0 && (
                             <span className="hidden shrink-0 text-[11px] tabular-nums text-[var(--text-faint)] lg:inline">
@@ -429,7 +449,7 @@ export function MarketplacePage({
                             <button
                               type="button"
                               onClick={() => onOpenExternalUrl(pkg.homepage)}
-                              title={`打开主页：${pkg.homepage}`}
+                              title={t(`打开主页：${pkg.homepage}`, `Open homepage: ${pkg.homepage}`)}
                               className="inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--link)]"
                             >
                               <ExternalLink className="h-3 w-3" />
@@ -443,11 +463,11 @@ export function MarketplacePage({
 
                       <div className="flex shrink-0 items-center gap-2">
                         {pkg.conflictBlocked ? (
-                          <StatusPill tone="danger">禁止覆盖官方</StatusPill>
+                          <StatusPill tone="danger">{t("禁止覆盖官方", "Official Protected")}</StatusPill>
                         ) : pkg.hasUpdate || pkg.status === "update-available" ? (
                           <>
                             <StatusPill tone="warn">
-                              可更新 {formatVersionText(pkg.installedVersion)} →{" "}
+                              {t("可更新", "Update")} {formatVersionText(pkg.installedVersion)} →{" "}
                               {formatVersionText(pkg.version)}
                             </StatusPill>
                             <button
@@ -457,18 +477,18 @@ export function MarketplacePage({
                               className="agy-btn-primary px-3 py-1.5 text-[12.5px]"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              <span>{isInstalling ? "更新中..." : "立即更新"}</span>
+                              <span>{isInstalling ? t("更新中...", "Updating...") : t("立即更新", "Update")}</span>
                             </button>
                           </>
                         ) : pkg.installed ? (
                           <>
-                            <StatusPill tone="ok">已是最新</StatusPill>
+                            <StatusPill tone="ok">{t("已是最新", "Up to date")}</StatusPill>
                             <button
                               type="button"
                               onClick={() => onManageInstalled(pkg.id)}
                               className="agy-btn px-3 py-1.5 text-[12.5px]"
                             >
-                              管理
+                              {t("管理", "Manage")}
                             </button>
                             <button
                               type="button"
@@ -477,15 +497,15 @@ export function MarketplacePage({
                               className="agy-btn px-3 py-1.5 text-[12.5px]"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              <span>{isInstalling ? "安装中..." : "重装"}</span>
+                              <span>{isInstalling ? t("安装中...", "Installing...") : t("重装", "Reinstall")}</span>
                             </button>
                           </>
                         ) : (
                           <>
                             {pkg.isNew || pkg.status === "new" ? (
-                              <StatusPill tone="info">新插件</StatusPill>
+                              <StatusPill tone="info">{t("新插件", "New")}</StatusPill>
                             ) : (
-                              <StatusPill tone="muted">未安装</StatusPill>
+                              <StatusPill tone="muted">{t("未安装", "Available")}</StatusPill>
                             )}
                             <button
                               type="button"
@@ -494,7 +514,7 @@ export function MarketplacePage({
                               className="agy-btn-primary px-3.5 py-1.5 text-[12.5px]"
                             >
                               <Download className="h-3.5 w-3.5" />
-                              <span>{isInstalling ? "下载中..." : "下载安装"}</span>
+                              <span>{isInstalling ? t("下载中...", "Downloading...") : t("下载安装", "Install")}</span>
                             </button>
                           </>
                         )}
@@ -507,14 +527,17 @@ export function MarketplacePage({
                         style={{ backgroundColor: "var(--warn-bg)" }}
                       >
                         <div className="font-semibold text-[var(--warn)]">
-                          自动筛查提醒（低危敏感行为）：
+                          {t("自动筛查提醒（低危敏感行为）：", "Automated Scan Notices (Low-Risk Behaviors):")}
                         </div>
                         <ul className="mt-1 space-y-0.5 text-[var(--text-primary)]">
-                          {pkg.riskFindings.slice(0, 4).map((rf, i) => (
-                            <li key={`${rf.code}-${i}`}>
-                              · {rf.title}：{rf.detail}
-                            </li>
-                          ))}
+                          {pkg.riskFindings.slice(0, 4).map((rf, i) => {
+                            const loc = localizeSecurityFinding(rf, isEn);
+                            return (
+                              <li key={`${rf.code}-${i}`}>
+                                · {loc.title}{t("：", ": ")}{loc.detail}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
@@ -531,7 +554,7 @@ export function MarketplacePage({
                     {changelogText && (
                       <section className="mt-2.5 ml-[50px] rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-3 py-2.5">
                         <h3 className="mb-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
-                          更新日志
+                          {t("更新日志", "Changelog")}
                         </h3>
                         <ReleaseNotes text={changelogText} onOpenUrl={onOpenExternalUrl} />
                       </section>
@@ -546,13 +569,13 @@ export function MarketplacePage({
 
       {/* Footer note */}
       <footer className="flex items-center justify-between px-0.5 text-[11.5px] text-[var(--text-faint)]">
-        <span>市场每 5 分钟自动检查更新</span>
+        <span>{t("市场每 5 分钟自动检查更新", "Marketplace checks for updates every 5 minutes")}</span>
         {remoteMarketplace?.checkedAt && (
           <span className="hidden tabular-nums sm:inline">
             {remoteMarketplace.source === "github-release"
-              ? "主数据源：仓库发布页"
+              ? t("主数据源：仓库发布页", "Source: GitHub Releases")
               : remoteMarketplace.source === "catalog"
-                ? "主数据源：仓库清单"
+                ? t("主数据源：仓库清单", "Source: Repository Catalog")
                 : ""}
           </span>
         )}
@@ -579,7 +602,7 @@ export function MarketplacePage({
             >
               <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-5 py-3.5">
                 <h3 className="text-[14.5px] font-bold text-[var(--text-primary)]">
-                  快捷上架插件到第三方市场
+                  {t("快捷上架插件到第三方市场", "Submit Plugin to Third-Party Market")}
                 </h3>
                 <button
                   type="button"
@@ -593,33 +616,36 @@ export function MarketplacePage({
 
               <form onSubmit={handleRunPreflight} className="space-y-3.5 px-5 py-4">
                 <p className="text-[12px] leading-relaxed text-[var(--text-muted)]">
-                  填好你的仓库地址和插件名称，软件会自动拉取最新发布的压缩包并检查代码风险。无高危即可免人工审核进第三方市场；若遇高危拦截，可改走官方通道人工审核。
+                  {t(
+                    "填好你的仓库地址和插件名称，软件会自动拉取最新发布的压缩包并检查代码风险。无高危即可免人工审核进第三方市场；若遇高危拦截，可改走官方通道人工审核。",
+                    "Enter your GitHub repository URL and plugin name. AGY Dock will fetch the latest release package and run automated security checks. Clean packages can be submitted directly to the third-party market; flagged packages can apply via the official review channel.",
+                  )}
                 </p>
 
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-[var(--text-primary)]">
-                    GitHub 仓库链接 *
+                    {t("GitHub 仓库链接 *", "GitHub Repository URL *")}
                   </label>
                   <input
                     type="text"
                     required
                     value={submitRepo}
                     onChange={(e) => setSubmitRepo(e.target.value)}
-                    placeholder="https://github.com/你的用户名/插件仓库名"
+                    placeholder="https://github.com/username/plugin-repo"
                     className="agy-input w-full font-mono-code text-[12.5px]"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-[var(--text-primary)]">
-                    插件展示名称 *
+                    {t("插件展示名称 *", "Plugin Display Name *")}
                   </label>
                   <input
                     type="text"
                     required
                     value={submitName}
                     onChange={(e) => setSubmitName(e.target.value)}
-                    placeholder="例如：子代理自动清理助手"
+                    placeholder={t("例如：子代理自动清理助手", "e.g. Subagent Auto Cleaner")}
                     className="agy-input w-full text-[12.5px]"
                   />
                 </div>
@@ -640,7 +666,8 @@ export function MarketplacePage({
                         {preflight.pluginName} ({formatVersionText(preflight.version)})
                       </span>
                       <span className="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-code text-[11px] text-[var(--text-muted)]">
-                        锁定 ID: {preflight.lockedId}
+                        {t("锁定 ID: ", "Locked ID: ")}
+                        {preflight.lockedId}
                       </span>
                     </div>
 
@@ -665,11 +692,14 @@ export function MarketplacePage({
                         <div className="font-semibold text-[var(--text-primary)]">
                           {preflight.scanReport.summary}
                         </div>
-                        {preflight.scanReport.findings.map((f, idx) => (
-                          <div key={idx} className="text-[11.5px] text-[var(--text-muted)]">
-                            · {f.title} ({f.file})：{f.detail}
-                          </div>
-                        ))}
+                        {preflight.scanReport.findings.map((f, idx) => {
+                          const loc = localizeSecurityFinding(f, isEn);
+                          return (
+                            <div key={idx} className="text-[11.5px] text-[var(--text-muted)]">
+                              · {loc.title} ({f.file}){t("：", ": ")}{loc.detail}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -681,7 +711,7 @@ export function MarketplacePage({
                           className="agy-btn-primary px-3 py-1.5 text-[12px]"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
-                          <span>高危已拦截，改走官方商店人工审核</span>
+                          <span>{t("高危已拦截，改走官方商店人工审核", "Blocked: Apply for Official Review")}</span>
                         </button>
                       ) : (
                         <>
@@ -693,7 +723,7 @@ export function MarketplacePage({
                             }}
                             className="agy-btn px-3 py-1.5 text-[12px]"
                           >
-                            先加到我的私人仓库
+                            {t("先加到我的私人仓库", "Add to Private Repos")}
                           </button>
                           <button
                             type="button"
@@ -701,7 +731,7 @@ export function MarketplacePage({
                             className="agy-btn-primary px-3 py-1.5 text-[12px]"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
-                            <span>一键提交到第三方公共市场</span>
+                            <span>{t("一键提交到第三方公共市场", "Submit to Public Third-Party Market")}</span>
                           </button>
                         </>
                       )}
@@ -716,14 +746,14 @@ export function MarketplacePage({
                     onClick={() => setSubmitOpen(false)}
                     className="agy-btn px-3.5 py-1.5 text-[12.5px]"
                   >
-                    关闭
+                    {t("关闭", "Close")}
                   </button>
                   <button
                     type="submit"
                     disabled={submitBusy}
                     className="agy-btn-primary px-3.5 py-1.5 text-[12.5px]"
                   >
-                    {submitBusy ? "正在拉取并检测代码..." : "检测最新版压缩包"}
+                    {submitBusy ? t("正在拉取并检测代码...", "Fetching & scanning package...") : t("检测最新版压缩包", "Scan Latest Release")}
                   </button>
                 </div>
               </form>
@@ -753,7 +783,7 @@ export function MarketplacePage({
             >
               <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-5 py-3.5">
                 <h3 className="text-[14.5px] font-bold text-[var(--text-primary)]">
-                  管理私人第三方仓库
+                  {t("管理私人第三方仓库", "Manage Private Repositories")}
                 </h3>
                 <button
                   type="button"
@@ -773,7 +803,7 @@ export function MarketplacePage({
                       required
                       value={newRepoInput}
                       onChange={(e) => setNewRepoInput(e.target.value)}
-                      placeholder="贴入 GitHub 仓库网址或 用户名/仓库名"
+                      placeholder={t("贴入 GitHub 仓库网址或 用户名/仓库名", "GitHub repo URL or owner/repo")}
                       className="agy-input flex-1 font-mono-code text-[12px]"
                     />
                     <button
@@ -781,14 +811,14 @@ export function MarketplacePage({
                       disabled={repoBusy}
                       className="agy-btn-primary shrink-0 px-3.5 py-1.5 text-[12px]"
                     >
-                      {repoBusy ? "添加中..." : "添加"}
+                      {repoBusy ? t("添加中...", "Adding...") : t("添加", "Add")}
                     </button>
                   </div>
                   <input
                     type="text"
                     value={newRepoLabel}
                     onChange={(e) => setNewRepoLabel(e.target.value)}
-                    placeholder="备注名称（可选，如：朋友的小工具库）"
+                    placeholder={t("备注名称（可选，如：朋友的小工具库）", "Optional label (e.g. Friend's Tools)")}
                     className="agy-input w-full text-[12px]"
                   />
                   {repoError && (
@@ -799,7 +829,7 @@ export function MarketplacePage({
                 <div className="max-h-[240px] divide-y divide-[var(--border-hairline)] overflow-y-auto rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)]">
                   {customRepos.length === 0 ? (
                     <div className="px-4 py-6 text-center text-[12px] text-[var(--text-muted)]">
-                      暂未添加私人第三方仓库
+                      {t("暂未添加私人第三方仓库", "No private repositories added yet")}
                     </div>
                   ) : (
                     customRepos.map((item) => (
@@ -819,14 +849,14 @@ export function MarketplacePage({
                           <SpringSwitch
                             checked={item.enabled !== false}
                             disabled={repoBusy}
-                            ariaLabel={`切换启用 ${item.repo}`}
+                            ariaLabel={t(`切换启用 ${item.repo}`, `Toggle ${item.repo}`)}
                             onChange={(next) => void onToggleCustomRepo(item.repo, next)}
                           />
                           <button
                             type="button"
                             disabled={repoBusy}
                             onClick={() => void onRemoveCustomRepo(item.repo)}
-                            title="移除仓库"
+                            title={t("移除仓库", "Remove repository")}
                             className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[var(--text-faint)] hover:bg-[var(--bg-subtle)] hover:text-[var(--danger)]"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

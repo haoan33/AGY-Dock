@@ -21,6 +21,13 @@ import { HeroStatusBadge, MOTION_EASE, StatusPill } from "../components/MotionPr
 import { QuotaBadgeSvg } from "../components/QuotaBadgeSvg";
 import { TokenUsageCard } from "../components/TokenUsageCard";
 import { formatBytes } from "../lib/format";
+import {
+  formatRunwayHoursLocalized,
+  localizeQuotaReason,
+  localizeQuotaResetIn,
+  localizeWeeklyForecastLabel,
+  useI18n,
+} from "../lib/i18n";
 import type {
   AccountQuotaRecord,
   AccountQuotaSnapshot,
@@ -71,17 +78,6 @@ function compactTierLabel(tierName: string | null | undefined): string {
   return t.length > 14 ? `${t.slice(0, 12)}…` : t;
 }
 
-function formatRunwayHours(hours: number | null | undefined): string {
-  if (hours === null || hours === undefined || !Number.isFinite(hours)) return "--";
-  if (hours <= 0) return "0分";
-  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))}分`;
-  if (hours < 24) return `${Math.round(hours)}时`;
-  const d = Math.floor(hours / 24);
-  const h = Math.round(hours % 24);
-  if (h >= 24) return `${d + 1}天`;
-  return h > 0 ? `${d}天${h}时` : `${d}天`;
-}
-
 export function StatusPage({
   overview,
   nativePlugins: _nativePlugins,
@@ -104,6 +100,7 @@ export function StatusPage({
   onNavigateExternal,
   onNavigateMarket,
 }: StatusPageProps) {
+  const { isEn, t } = useI18n();
   const [maskEmail, setMaskEmail] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem("agy:mask-quota-email") === "1";
@@ -196,26 +193,32 @@ export function StatusPage({
   }
 
   let heroTone: "ok" | "warn" | "muted" = "muted";
-  let heroTitle = "检测 Antigravity";
-  let heroSub = "等待连接";
-  let launchLabel = "启动 Antigravity";
+  let heroTitle = t("检测 Antigravity", "Checking Antigravity");
+  let heroSub = t("等待连接", "Waiting for connection");
+  let launchLabel = t("启动 Antigravity", "Launch Antigravity");
 
   if (overview) {
     if (cdpReady) {
       heroTone = "ok";
-      heroTitle = "Antigravity 已连接";
-      heroSub = `CDP :${port} · ${mainCnt} 窗口`;
-      launchLabel = "唤醒主窗口";
+      heroTitle = t("Antigravity 已连接", "Antigravity Connected");
+      heroSub = t(`CDP :${port} · ${mainCnt} 窗口`, `CDP :${port} · ${mainCnt} window${mainCnt === 1 ? "" : "s"}`);
+      launchLabel = t("唤醒主窗口", "Focus Window");
     } else if (mainCnt > 0) {
       heroTone = "warn";
-      heroTitle = "Antigravity 准备中";
-      heroSub = `${mainCnt} 窗口启动中`;
-      launchLabel = "唤醒主窗口";
+      heroTitle = t("Antigravity 准备中", "Antigravity Starting");
+      heroSub = t(`${mainCnt} 窗口启动中`, `${mainCnt} window${mainCnt === 1 ? "" : "s"} starting`);
+      launchLabel = t("唤醒主窗口", "Focus Window");
     } else {
       heroTone = "muted";
-      heroTitle = sidecarCnt === 0 ? "Antigravity 未运行" : "Antigravity 后台驻留";
-      heroSub = sidecarCnt === 0 ? "启动后自动接入插件与额度" : `${sidecarCnt} 个后台进程`;
-      launchLabel = "启动 Antigravity";
+      heroTitle =
+        sidecarCnt === 0
+          ? t("Antigravity 未运行", "Antigravity Not Running")
+          : t("Antigravity 后台驻留", "Antigravity in Background");
+      heroSub =
+        sidecarCnt === 0
+          ? t("启动后自动接入插件与额度", "Launch to auto-attach plugins and sync quota")
+          : t(`${sidecarCnt} 个后台进程`, `${sidecarCnt} background process${sidecarCnt === 1 ? "" : "es"}`);
+      launchLabel = t("启动 Antigravity", "Launch Antigravity");
     }
   }
 
@@ -284,9 +287,9 @@ export function StatusPage({
   };
 
   const emailDisplay = useMemo(() => {
-    if (!displayEmail) return displayName || "未登录";
+    if (!displayEmail) return displayName || t("未登录", "Not signed in");
     return maskEmail ? maskEmailAddress(displayEmail) : displayEmail;
-  }, [displayEmail, displayName, maskEmail]);
+  }, [displayEmail, displayName, maskEmail, t]);
 
   const avatarInitial = useMemo(() => {
     const src = displayName || displayEmail || "A";
@@ -335,7 +338,9 @@ export function StatusPage({
                   </StatusPill>
                   {runningPlugins.length > 0 && (
                     <StatusPill tone="muted">
-                      {totalMem > 0 ? formatBytes(totalMem) : `${runningPlugins.length} 活跃`}
+                      {totalMem > 0
+                        ? formatBytes(totalMem)
+                        : t(`${runningPlugins.length} 活跃`, `${runningPlugins.length} active`)}
                     </StatusPill>
                   )}
                 </div>
@@ -353,7 +358,7 @@ export function StatusPage({
             className="agy-btn"
           >
             <PlugZap className="h-3.5 w-3.5" />
-            <span>{busyAttach ? "附着中..." : "热附着"}</span>
+            <span>{busyAttach ? t("附着中...", "Attaching...") : t("热附着", "Hot Attach")}</span>
           </button>
           <button
             type="button"
@@ -362,17 +367,19 @@ export function StatusPage({
             className="agy-btn-primary"
           >
             <Rocket className="h-3.5 w-3.5" />
-            <span>{busyLaunch ? "启动中..." : launchLabel}</span>
+            <span>{busyLaunch ? t("启动中...", "Launching...") : launchLabel}</span>
           </button>
         </div>
       </section>
 
-      {/* 2. Full-Width Account Quota Banner (Scheme 2) */}
+      {/* 2. Full-Width Account Quota Banner */}
       <section className="agy-card flex flex-col gap-2.5 px-4 py-3.5">
         {/* Quota Header */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-[13.5px] font-semibold text-[var(--text-primary)]">账号额度</span>
+            <span className="text-[13.5px] font-semibold text-[var(--text-primary)]">
+              {t("账号额度", "Account Quota")}
+            </span>
 
             {(displayEmail || displayName || cachedAccounts.length > 0) && (
               <div
@@ -390,7 +397,11 @@ export function StatusPage({
                   onClick={toggleSwitcher}
                   aria-haspopup={cachedAccounts.length > 0 ? "listbox" : undefined}
                   aria-expanded={cachedAccounts.length > 0 ? switcherOpen : undefined}
-                  title={cachedAccounts.length > 0 ? "切换已登录账号查看最近额度缓存" : undefined}
+                  title={
+                    cachedAccounts.length > 0
+                      ? t("切换已登录账号查看最近额度缓存", "Switch accounts to view cached quotas")
+                      : undefined
+                  }
                   className={`flex min-w-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sage)] ${
                     cachedAccounts.length > 0 ? "cursor-pointer" : "cursor-default"
                   }`}
@@ -415,7 +426,7 @@ export function StatusPage({
                       <span
                         className="absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full border border-[var(--bg-surface-soft)]"
                         style={{ backgroundColor: "var(--ok)" }}
-                        title="当前登录实时账号"
+                        title={t("当前登录实时账号", "Currently signed-in live account")}
                       />
                     )}
                   </span>
@@ -444,8 +455,8 @@ export function StatusPage({
                     type="button"
                     onClick={() => setMaskEmail((v) => !v)}
                     className="cursor-pointer rounded p-0.5 text-[var(--text-faint)] hover:text-[var(--text-primary)]"
-                    title={maskEmail ? "显示完整邮箱" : "隐藏邮箱"}
-                    aria-label={maskEmail ? "显示完整邮箱" : "隐藏邮箱"}
+                    title={maskEmail ? t("显示完整邮箱", "Show full email") : t("隐藏邮箱", "Hide email")}
+                    aria-label={maskEmail ? t("显示完整邮箱", "Show full email") : t("隐藏邮箱", "Hide email")}
                   >
                     {maskEmail ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                   </button>
@@ -473,10 +484,10 @@ export function StatusPage({
                   type="button"
                   onClick={() => onSelectAccount(null)}
                   className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-                  title="切回当前 Antigravity 登录账号的实时额度"
+                  title={t("切回当前 Antigravity 登录账号的实时额度", "Switch back to active Antigravity account")}
                 >
                   <RotateCcw className="h-3 w-3" />
-                  <span>切回当前</span>
+                  <span>{t("切回当前", "Back to Live")}</span>
                 </button>
                 <span
                   className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
@@ -485,10 +496,13 @@ export function StatusPage({
                     borderColor: "rgba(217, 119, 6, 0.28)",
                     color: "var(--warn)",
                   }}
-                  title="正在查看该账号最近一次同步的缓存额度，非当前 Antigravity 实时登录账号"
+                  title={t(
+                    "正在查看该账号最近一次同步的缓存额度，非当前 Antigravity 实时登录账号",
+                    "Viewing last synced quota cache for this account (not currently signed in)",
+                  )}
                 >
                   <Clock3 className="h-3 w-3" />
-                  <span>历史缓存</span>
+                  <span>{t("历史缓存", "Cached")}</span>
                   {displayUpdatedAtText && (
                     <span className="tabular-nums opacity-80">({displayUpdatedAtText})</span>
                   )}
@@ -502,10 +516,10 @@ export function StatusPage({
                   borderColor: "rgba(217, 119, 6, 0.28)",
                   color: "var(--warn)",
                 }}
-                title="非最新实时数据，打开 Antigravity 后自动更新"
+                title={t("非最新实时数据，打开 Antigravity 后自动更新", "Offline cache; launches with Antigravity to refresh")}
               >
                 <Clock3 className="h-3 w-3" />
-                <span>离线缓存 · 打开 AGY 更新</span>
+                <span>{t("离线缓存 · 打开 AGY 更新", "Offline Cache · Open AGY to sync")}</span>
                 {displayUpdatedAtText && (
                   <span className="tabular-nums opacity-80">({displayUpdatedAtText})</span>
                 )}
@@ -521,8 +535,8 @@ export function StatusPage({
               disabled={busyQuotaRefresh}
               onClick={onRefreshQuota}
               className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:opacity-50"
-              title="刷新额度"
-              aria-label="刷新额度"
+              title={t("刷新额度", "Refresh quota")}
+              aria-label={t("刷新额度", "Refresh quota")}
             >
               <RefreshCw className={`h-3 w-3 ${busyQuotaRefresh ? "animate-spin" : ""}`} />
             </button>
@@ -534,8 +548,8 @@ export function StatusPage({
           <div className="agy-inset flex items-center justify-between gap-3 px-3.5 py-2.5 text-[12px] text-[var(--text-muted)]">
             <span>
               {accountQuota
-                ? accountQuota.reason || "暂无缓存，打开 Antigravity 自动同步"
-                : "正在读取额度..."}
+                ? localizeQuotaReason(accountQuota.reason, isEn)
+                : t("正在读取额度...", "Loading quota...")}
             </span>
           </div>
         ) : (
@@ -563,6 +577,8 @@ export function StatusPage({
               const wkWarn =
                 forecast?.status === "tight" || forecast?.status === "exhausted";
               const wkLow = pool.weekly.available && (wkPct <= 25 || wkWarn);
+              const hourResetText = localizeQuotaResetIn(pool.fiveHour, isEn);
+              const weeklyResetText = localizeQuotaResetIn(pool.weekly, isEn);
 
               return (
                 <div
@@ -602,7 +618,7 @@ export function StatusPage({
                           {pool.label}
                         </div>
                         <div className="truncate text-[10.5px] text-[var(--text-faint)]">
-                          {isArgon ? "Pro 独立周池" : "5h / 周"}
+                          {isArgon ? t("Pro 独立周池", "Pro Weekly Pool") : t("5h / 周", "5h / Weekly")}
                         </div>
                       </div>
                     </div>
@@ -615,7 +631,7 @@ export function StatusPage({
                           color: forecastToneColor,
                         }}
                       >
-                        {forecast.label}
+                        {localizeWeeklyForecastLabel(forecast, isEn)}
                       </span>
                     )}
                   </div>
@@ -631,9 +647,9 @@ export function StatusPage({
                           {pool.weekly.available && wkPct < 100
                             ? [
                                 forecast?.dailyBurnPct && forecast.dailyBurnPct > 0
-                                  ? `-${forecast.dailyBurnPct}%/天`
+                                  ? t(`-${forecast.dailyBurnPct}%/天`, `-${forecast.dailyBurnPct}%/d`)
                                   : "",
-                                pool.weekly.resetIn,
+                                weeklyResetText,
                               ]
                                 .filter(Boolean)
                                 .join(" · ")
@@ -653,7 +669,7 @@ export function StatusPage({
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1.5">
-                      {/* 5h Period (NO prediction; omit reset countdown if unused 100%) */}
+                      {/* 5h Period */}
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center justify-between text-[11px] tabular-nums">
                           <span className="text-[var(--text-muted)]">
@@ -663,8 +679,8 @@ export function StatusPage({
                             </strong>
                           </span>
                           <span className="text-[var(--text-faint)]">
-                            {pool.fiveHour.available && hourPct < 100 && pool.fiveHour.resetIn
-                              ? pool.fiveHour.resetIn
+                            {pool.fiveHour.available && hourPct < 100 && hourResetText
+                              ? hourResetText
                               : ""}
                           </span>
                         </div>
@@ -680,11 +696,11 @@ export function StatusPage({
                         />
                       </div>
 
-                      {/* Weekly Period (omit reset countdown & forecast if unused 100%) */}
+                      {/* Weekly Period */}
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center justify-between text-[11px] tabular-nums">
                           <span className="text-[var(--text-muted)]">
-                            周{" "}
+                            {t("周", "Wk")}{" "}
                             <strong className="font-semibold text-[var(--text-primary)]">
                               {pool.weekly.available ? `${wkPct}%` : "--"}
                             </strong>
@@ -693,9 +709,9 @@ export function StatusPage({
                             {pool.weekly.available && wkPct < 100
                               ? [
                                   forecast?.dailyBurnPct && forecast.dailyBurnPct > 0
-                                    ? `-${forecast.dailyBurnPct}%/天`
+                                    ? t(`-${forecast.dailyBurnPct}%/天`, `-${forecast.dailyBurnPct}%/d`)
                                     : "",
-                                  pool.weekly.resetIn,
+                                  weeklyResetText,
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")
@@ -729,7 +745,9 @@ export function StatusPage({
         {/* Right: Active Plugin Spotlight */}
         <section className="agy-card flex min-h-0 flex-col p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-[13.5px] font-semibold text-[var(--text-primary)]">活跃插件</h2>
+            <h2 className="text-[13.5px] font-semibold text-[var(--text-primary)]">
+              {t("活跃插件", "Active Plugins")}
+            </h2>
             <span className="text-[11.5px] font-medium tabular-nums text-[var(--text-faint)]">
               {totalMem > 0
                 ? `${runningPlugins.length}/${plugins.length} · ${formatBytes(totalMem)}`
@@ -748,9 +766,11 @@ export function StatusPage({
                   transition={{ duration: 0.14, ease: MOTION_EASE }}
                   className="agy-inset flex flex-1 flex-col items-center justify-center px-4 py-6 text-center"
                 >
-                  <p className="text-[12.5px] text-[var(--text-muted)]">无运行中插件</p>
+                  <p className="text-[12.5px] text-[var(--text-muted)]">
+                    {t("无运行中插件", "No active plugins")}
+                  </p>
                   <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-                    启动 Antigravity 或点击「热附着」
+                    {t("启动 Antigravity 或点击「热附着」", "Launch Antigravity or click Hot Attach")}
                   </p>
                 </motion.div>
               ) : (
@@ -785,7 +805,7 @@ export function StatusPage({
               onClick={onNavigateExternal}
               className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-[var(--link)] hover:underline"
             >
-              <span>管理插件</span>
+              <span>{t("管理插件", "Manage Plugins")}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
             <button
@@ -793,7 +813,7 @@ export function StatusPage({
               onClick={onNavigateMarket}
               className="cursor-pointer text-[12px] font-semibold text-[var(--link)] hover:underline"
             >
-              插件市场
+              {t("插件市场", "Marketplace")}
             </button>
           </div>
         </section>
@@ -801,7 +821,7 @@ export function StatusPage({
 
       {/* 4. Minimal Quiet Footer */}
       <footer className="flex items-center justify-between px-0.5 text-[11px] text-[var(--text-faint)]">
-        <span>独立沙盒托管</span>
+        <span>{t("独立沙盒托管", "Isolated Sandbox Host")}</span>
         <span className="font-mono-code">
           {overview?.version ? `v${overview.version}` : ""}
           {overview?.isPortable ? " · Portable" : ""}
@@ -816,7 +836,7 @@ export function StatusPage({
             ref={popoverRef}
             data-pool-popover="true"
             role="dialog"
-            aria-label={`${detailPool.label} 详情`}
+            aria-label={t(`${detailPool.label} 详情`, `${detailPool.label} details`)}
             className="fixed z-[9990] rounded-xl border border-[var(--border-strong)] bg-[var(--bg-elevated)] p-3.5 shadow-[var(--shadow-floating)]"
             style={popoverStyle}
           >
@@ -828,7 +848,7 @@ export function StatusPage({
                 type="button"
                 onClick={() => setDetailState(null)}
                 className="rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                aria-label="关闭详情"
+                aria-label={t("关闭详情", "Close details")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -839,9 +859,9 @@ export function StatusPage({
                 detailPool.fiveHour.percent !== 100 &&
                 Boolean(detailPool.fiveHour.resetIn) && (
                   <div className="flex items-center justify-between text-[var(--text-muted)]">
-                    <span>5h 重置</span>
+                    <span>{t("5h 重置", "5h Reset")}</span>
                     <span className="text-[var(--text-primary)]">
-                      {detailPool.fiveHour.resetIn} ({detailPool.fiveHour.resetClock})
+                      {localizeQuotaResetIn(detailPool.fiveHour, isEn)} ({detailPool.fiveHour.resetClock})
                     </span>
                   </div>
                 )}
@@ -849,31 +869,36 @@ export function StatusPage({
                 detailPool.weekly.percent !== 100 &&
                 Boolean(detailPool.weekly.resetIn) && (
                   <div className="flex items-center justify-between text-[var(--text-muted)]">
-                    <span>周重置</span>
+                    <span>{t("周重置", "Weekly Reset")}</span>
                     <span className="text-[var(--text-primary)]">
-                      {detailPool.weekly.resetIn} ({detailPool.weekly.resetClock})
+                      {localizeQuotaResetIn(detailPool.weekly, isEn)} ({detailPool.weekly.resetClock})
                     </span>
                   </div>
                 )}
               {detailPool.weekly.available &&
                 (detailPool.weekly.percent === 100 || !detailPool.weekly.resetIn) && (
-                  <div className="text-[var(--text-faint)]">尚未使用 · 暂无重置计时</div>
+                  <div className="text-[var(--text-faint)]">
+                    {t("尚未使用 · 暂无重置计时", "Unused · No active reset timer")}
+                  </div>
                 )}
               {detailPool.weeklyForecast?.dailyBurnPct !== null &&
                 detailPool.weeklyForecast?.dailyBurnPct !== undefined && (
                   <div className="flex items-center justify-between text-[var(--text-muted)]">
-                    <span>日均消耗</span>
+                    <span>{t("日均消耗", "Daily Burn")}</span>
                     <span className="text-[var(--text-primary)]">
-                      -{detailPool.weeklyForecast.dailyBurnPct}%/天
+                      {t(
+                        `-${detailPool.weeklyForecast.dailyBurnPct}%/天`,
+                        `-${detailPool.weeklyForecast.dailyBurnPct}%/day`,
+                      )}
                     </span>
                   </div>
                 )}
               {detailPool.weeklyForecast?.runwayHours !== null &&
                 detailPool.weeklyForecast?.runwayHours !== undefined && (
                   <div className="flex items-center justify-between text-[var(--text-muted)]">
-                    <span>预计可用</span>
+                    <span>{t("预计可用", "Est. Runway")}</span>
                     <span className="text-[var(--text-primary)]">
-                      {formatRunwayHours(detailPool.weeklyForecast.runwayHours)}
+                      {formatRunwayHoursLocalized(detailPool.weeklyForecast.runwayHours, isEn)}
                     </span>
                   </div>
                 )}
@@ -881,7 +906,9 @@ export function StatusPage({
 
             {detailPool.models.length > 0 && (
               <div className="mt-2.5 border-t border-[var(--border-hairline)] pt-2">
-                <div className="mb-1 text-[10.5px] text-[var(--text-faint)]">覆盖模型</div>
+                <div className="mb-1 text-[10.5px] text-[var(--text-faint)]">
+                  {t("覆盖模型", "Covered Models")}
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {detailPool.models.map((m) => (
                     <span
@@ -907,16 +934,16 @@ export function StatusPage({
             ref={switcherPopoverRef}
             data-account-switcher-popover="true"
             role="listbox"
-            aria-label="切换账号查看额度缓存"
+            aria-label={t("切换账号查看额度缓存", "Switch account to view cached quota")}
             className="fixed z-[9995] w-[312px] rounded-xl border border-[var(--border-strong)] bg-[var(--bg-elevated)] p-2 shadow-[var(--shadow-floating)]"
             style={{ left: switcherPos.left, top: switcherPos.top }}
           >
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-[11.5px] font-semibold text-[var(--text-primary)]">
-                切换账号
+                {t("切换账号", "Switch Account")}
               </span>
               <span className="text-[10.5px] tabular-nums text-[var(--text-faint)]">
-                共 {cachedAccounts.length} 个
+                {t(`共 ${cachedAccounts.length} 个`, `${cachedAccounts.length} total`)}
               </span>
             </div>
 
@@ -1000,11 +1027,15 @@ export function StatusPage({
                                 className="inline-block h-1.5 w-1.5 rounded-full"
                                 style={{ backgroundColor: "var(--ok)" }}
                               />
-                              <span style={{ color: "var(--ok)" }}>当前登录 · 实时</span>
+                              <span style={{ color: "var(--ok)" }}>
+                                {t("当前登录 · 实时", "Signed in · Live")}
+                              </span>
                               {acc.updatedAtText && <span>· {acc.updatedAtText}</span>}
                             </>
                           ) : (
-                            <span>最近更新 {acc.updatedAtText || "--"}</span>
+                            <span>
+                              {t("最近更新", "Updated")} {acc.updatedAtText || "--"}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1026,8 +1057,8 @@ export function StatusPage({
                           onRemoveCachedAccount(acc.accountKey);
                         }}
                         className="shrink-0 cursor-pointer rounded p-1 text-[var(--text-faint)] transition-colors hover:bg-[var(--danger-bg)] hover:text-[var(--danger)] disabled:opacity-40"
-                        title="移除此账号缓存"
-                        aria-label={`移除 ${rowLabel} 的额度缓存`}
+                        title={t("移除此账号缓存", "Remove cached account")}
+                        aria-label={t(`移除 ${rowLabel} 的额度缓存`, `Remove cached quota for ${rowLabel}`)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -1039,8 +1070,14 @@ export function StatusPage({
 
             <div className="mt-1.5 border-t border-[var(--border-hairline)] px-2 pt-1.5 text-[10.5px] leading-snug text-[var(--text-faint)]">
               {cachedAccounts.length > 1
-                ? "切换仅用于查看各账号最近一次更新的额度缓存"
-                : "在 Antigravity 切换登录其他账号后，将自动记录并可在此切换查看"}
+                ? t(
+                    "切换仅用于查看各账号最近一次更新的额度缓存",
+                    "Switching previews the last synced quota cache for each account",
+                  )
+                : t(
+                    "在 Antigravity 切换登录其他账号后，将自动记录并可在此切换查看",
+                    "Sign into other accounts in Antigravity to automatically record and preview them here",
+                  )}
             </div>
           </div>,
           document.body
@@ -1062,7 +1099,8 @@ function ActiveSpotlightCard({
   onStop: () => void;
   onOpen: () => void;
 }) {
-  const pidsText = plugin.pids?.length ? `PID ${plugin.pids.join(", ")}` : "运行中";
+  const { t } = useI18n();
+  const pidsText = plugin.pids?.length ? `PID ${plugin.pids.join(", ")}` : t("运行中", "Running");
   const memText = plugin.memoryBytes > 0 ? ` · ${formatBytes(plugin.memoryBytes)}` : "";
   const healthPort =
     plugin.health && typeof plugin.health === "object" && "port" in plugin.health
@@ -1114,7 +1152,7 @@ function ActiveSpotlightCard({
         className="agy-btn shrink-0 px-2.5 py-1 text-[11.5px]"
       >
         <Square className="h-3 w-3" />
-        <span>{stopping ? "停止中" : "停止"}</span>
+        <span>{stopping ? t("停止中", "Stopping") : t("停止", "Stop")}</span>
       </button>
     </motion.div>
   );

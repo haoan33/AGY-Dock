@@ -12,6 +12,7 @@ import { NativeMonogram } from "../components/BrandMark";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { SpringSwitch, StatusPill } from "../components/MotionPrimitives";
 import { formatErrorMessage } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import { ipc } from "../lib/ipc";
 import type { NativePluginInfo } from "../types/ipc";
 
@@ -32,6 +33,7 @@ export function NativePluginDetailPage({
   onOpenUrl,
   onToast,
 }: NativePluginDetailPageProps) {
+  const { t } = useI18n();
   const [toggling, setToggling] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -49,9 +51,15 @@ export function NativePluginDetailPage({
     try {
       const next = await ipc.toggleNativePlugin(plugin.dir, enabled);
       onNativePluginsUpdated(next);
-      onToast(`原生扩展「${plugin.name}」已${enabled ? "启用" : "禁用"}`, "ok");
+      onToast(
+        t(
+          `原生扩展「${plugin.name}」已${enabled ? "启用" : "禁用"}`,
+          `Native extension "${plugin.name}" ${enabled ? "enabled" : "disabled"}`,
+        ),
+        "ok",
+      );
     } catch (err) {
-      onToast(`切换扩展状态失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`切换扩展状态失败：${formatErrorMessage(err)}`, `Failed to toggle extension: ${formatErrorMessage(err)}`), "error");
     } finally {
       setToggling(false);
     }
@@ -62,7 +70,7 @@ export function NativePluginDetailPage({
     try {
       await ipc.openPathInExplorer(plugin.path);
     } catch (err) {
-      onToast(`打开目录失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开目录失败：${formatErrorMessage(err)}`, `Failed to open folder: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -70,7 +78,7 @@ export function NativePluginDetailPage({
     try {
       await ipc.openInNotepad(filePath);
     } catch (err) {
-      onToast(`打开记事本失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`打开记事本失败：${formatErrorMessage(err)}`, `Failed to open Notepad: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -80,11 +88,14 @@ export function NativePluginDetailPage({
       const next = await ipc.deleteNativePlugin(plugin.dir, deleteDialog.recycleBin);
       setDeleteDialog({ open: false, recycleBin: true, busy: false });
       onNativePluginsUpdated(next);
-      onToast(`已卸载原生扩展「${plugin.name}」`, "ok");
+      onToast(
+        t(`已卸载原生扩展「${plugin.name}」`, `Uninstalled native extension "${plugin.name}"`),
+        "ok",
+      );
       onBack();
     } catch (err) {
       setDeleteDialog((prev) => ({ ...prev, busy: false }));
-      onToast(`卸载扩展失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`卸载扩展失败：${formatErrorMessage(err)}`, `Failed to uninstall extension: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -98,25 +109,28 @@ export function NativePluginDetailPage({
           className="group inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
         >
           <ArrowLeft className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-0.5" />
-          <span>返回原生管理</span>
+          <span>{t("返回原生管理", "Back to Native")}</span>
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={plugin.enabled ? "ok" : "muted"}>
-            {plugin.enabled ? "● 已启用" : "已禁用"}
+            {plugin.enabled ? t("● 已启用", "● Enabled") : t("已禁用", "Disabled")}
           </StatusPill>
 
           <SpringSwitch
             checked={plugin.enabled}
             disabled={toggling}
-            ariaLabel={`${plugin.enabled ? "禁用" : "启用"}原生扩展 ${plugin.name}`}
+            ariaLabel={t(
+              `${plugin.enabled ? "禁用" : "启用"}原生扩展 ${plugin.name}`,
+              `${plugin.enabled ? "Disable" : "Enable"} native extension ${plugin.name}`,
+            )}
             onChange={handleToggle}
           />
 
           {plugin.path && (
             <button type="button" onClick={handleOpenFolder} className="agy-btn px-2.5 py-1 text-[12px]">
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>打开目录</span>
+              <span>{t("打开目录", "Open Folder")}</span>
             </button>
           )}
 
@@ -126,7 +140,7 @@ export function NativePluginDetailPage({
             className="agy-btn-danger-ghost px-2.5 py-1 text-[12px]"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>卸载扩展</span>
+            <span>{t("卸载扩展", "Uninstall")}</span>
           </button>
         </div>
       </div>
@@ -145,7 +159,7 @@ export function NativePluginDetailPage({
               </span>
             </div>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-muted)]">
-              {plugin.description || "内置原生扩展"}
+              {plugin.description || t("内置原生扩展", "Built-in native extension")}
             </p>
             {plugin.homepage && (
               <button
@@ -162,28 +176,28 @@ export function NativePluginDetailPage({
 
         {/* Spec Box */}
         <div className="agy-inset space-y-3 p-5">
-          <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-            <span className="font-medium text-[var(--text-muted)]">目录</span>
+          <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+            <span className="font-medium text-[var(--text-muted)]">{t("目录", "Directory")}</span>
             <span className="break-all font-mono-code text-[12px] text-[var(--text-primary)] select-text">
               {plugin.path || `~/.gemini/config/plugins/${plugin.dir}`}
             </span>
           </div>
 
           {plugin.author && (
-            <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-              <span className="font-medium text-[var(--text-muted)]">作者</span>
+            <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+              <span className="font-medium text-[var(--text-muted)]">{t("作者", "Author")}</span>
               <span className="text-[var(--text-primary)]">{plugin.author}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-            <span className="font-medium text-[var(--text-muted)]">组件概览</span>
+          <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+            <span className="font-medium text-[var(--text-muted)]">{t("组件概览", "Components")}</span>
             <span className="text-[var(--text-muted)]">{caps.join(" / ")}</span>
           </div>
 
           {plugin.mcpNames && plugin.mcpNames.length > 0 && (
-            <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-              <span className="font-medium text-[var(--text-muted)]">MCP 服务</span>
+            <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+              <span className="font-medium text-[var(--text-muted)]">{t("MCP 服务", "MCP Servers")}</span>
               <div className="flex flex-wrap items-center gap-2">
                 {plugin.mcpNames.map((name) => (
                   <span
@@ -201,7 +215,7 @@ export function NativePluginDetailPage({
                     className="agy-btn px-2 py-1 text-[11.5px]"
                   >
                     <NotebookPen className="h-3 w-3" />
-                    <span>记事本查看 mcp_config.json</span>
+                    <span>{t("记事本查看 mcp_config.json", "View mcp_config.json")}</span>
                   </button>
                 )}
               </div>
@@ -209,8 +223,8 @@ export function NativePluginDetailPage({
           )}
 
           {plugin.ruleFiles && plugin.ruleFiles.length > 0 && (
-            <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-              <span className="font-medium text-[var(--text-muted)]">扩展规则</span>
+            <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+              <span className="font-medium text-[var(--text-muted)]">{t("扩展规则", "Rules")}</span>
               <div className="flex flex-wrap gap-2">
                 {plugin.ruleFiles.map((rf) => (
                   <button
@@ -230,8 +244,8 @@ export function NativePluginDetailPage({
           )}
 
           {plugin.sidecars.length > 0 && (
-            <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
-              <span className="font-medium text-[var(--text-muted)]">Sidecar 进程</span>
+            <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
+              <span className="font-medium text-[var(--text-muted)]">{t("Sidecar 进程", "Sidecars")}</span>
               <div className="flex flex-wrap gap-2">
                 {plugin.sidecars.map((sc) => (
                   <span
@@ -247,9 +261,9 @@ export function NativePluginDetailPage({
           )}
 
           {plugin.skillNames && plugin.skillNames.length > 0 && (
-            <div className="grid grid-cols-[96px_1fr] items-start gap-4 text-[13px]">
+            <div className="grid grid-cols-[110px_1fr] items-start gap-4 text-[13px]">
               <span className="font-medium text-[var(--text-muted)]">
-                内置技能 ({plugin.skillNames.length})
+                {t(`内置技能 (${plugin.skillNames.length})`, `Skills (${plugin.skillNames.length})`)}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {plugin.skillNames.map((sk) => (
@@ -269,12 +283,15 @@ export function NativePluginDetailPage({
 
       <ConfirmModal
         open={deleteDialog.open}
-        title="确认卸载原生扩展"
-        description={`确定卸载 AGY 原生扩展「${plugin.name}」吗？\n\n目录：${plugin.path || `~/.gemini/config/plugins/${plugin.dir}`}\n将移除其包含的技能、规则及扩展级 MCP 配置，并清理 config.json 中的记录。`}
-        confirmLabel="确认卸载"
+        title={t("确认卸载原生扩展", "Uninstall Native Extension")}
+        description={t(
+          `确定卸载 AGY 原生扩展「${plugin.name}」吗？\n\n目录：${plugin.path || `~/.gemini/config/plugins/${plugin.dir}`}\n将移除其包含的技能、规则及扩展级 MCP 配置，并清理 config.json 中的记录。`,
+          `Uninstall AGY native extension "${plugin.name}"?\n\nDirectory: ${plugin.path || `~/.gemini/config/plugins/${plugin.dir}`}\nThis removes its skills, rules, and bundled MCP config, and cleans its entry from config.json.`,
+        )}
+        confirmLabel={t("确认卸载", "Uninstall")}
         tone="danger"
         busy={deleteDialog.busy}
-        checkboxLabel="移入 Windows 回收站（取消勾选将永久删除）"
+        checkboxLabel={t("移入 Windows 回收站（取消勾选将永久删除）", "Move to Windows Recycle Bin (uncheck to delete permanently)")}
         checkboxChecked={deleteDialog.recycleBin}
         onCheckboxChange={(checked) =>
           setDeleteDialog((prev) => ({ ...prev, recycleBin: checked }))

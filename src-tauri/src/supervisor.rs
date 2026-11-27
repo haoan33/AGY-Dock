@@ -871,6 +871,33 @@ pub fn start_plugin(
     })
 }
 
+const PLUGIN_START_STAGGER: Duration = Duration::from_millis(500);
+
+fn run_staggered_batch<T, R, F, S>(
+    items: impl IntoIterator<Item = T>,
+    mut start_one: F,
+    mut stagger_sleep: S,
+) -> Vec<R>
+where
+    F: FnMut(T) -> (bool, R),
+    S: FnMut(),
+{
+    let mut results = Vec::new();
+    let mut wait_before_next = false;
+    for item in items {
+        if wait_before_next {
+            stagger_sleep();
+            wait_before_next = false;
+        }
+        let (did_launch, res) = start_one(item);
+        if did_launch {
+            wait_before_next = true;
+        }
+        results.push(res);
+    }
+    results
+}
+
 pub fn attach_enabled_plugins(paths: &ManagerPaths, mode: &str) -> Result<Vec<PluginActionResult>, String> {
     attach_filtered_plugins(paths, mode, |_| true, false)
 }
@@ -908,7 +935,7 @@ where
     } else {
         None
     };
-    let mut results = Vec::new();
+    let mut eligible = Vec::new();
     for plugin in &cfg.plugins {
         if !plugin.enabled || !predicate(plugin) {
             if !plugin.enabled {
@@ -921,22 +948,30 @@ where
                 continue;
             }
         }
-        match start_plugin(paths, &plugin.id, mode) {
-            Ok(res) => results.push(res),
-            Err(err) => {
-                paths.log_error(&format!("启动插件 {} 失败: {err}", plugin.id));
-                results.push(PluginActionResult {
-                    id: plugin.id.clone(),
-                    pid: None,
-                    mode: None,
-                    cdp_port: None,
-                    stopped: None,
-                    status: Some("error".to_string()),
-                    error: Some(err),
-                });
-            }
-        }
+        eligible.push(plugin.id.clone());
     }
+    let results = run_staggered_batch(
+        eligible,
+        |plugin_id| match start_plugin(paths, &plugin_id, mode) {
+            Ok(res) => (true, res),
+            Err(err) => {
+                paths.log_error(&format!("启动插件 {plugin_id} 失败: {err}"));
+                (
+                    false,
+                    PluginActionResult {
+                        id: plugin_id,
+                        pid: None,
+                        mode: None,
+                        cdp_port: None,
+                        stopped: None,
+                        status: Some("error".to_string()),
+                        error: Some(err),
+                    },
+                )
+            }
+        },
+        || std::thread::sleep(PLUGIN_START_STAGGER),
+    );
     Ok(results)
 }
 
@@ -1527,6 +1562,60 @@ mod tests {
                 "--proxy-server=http://127.0.0.1:7890".to_string(),
                 "--proxy-bypass-list=127.0.0.1;localhost;::1;play.googleapis.com".to_string(),
             ]
+        );
+    }
+
+    #[test]
+    fn run_staggered_batch_skips_sleep_for_empty_or_single_item() {
+        let mut sleeps = 0usize;
+        let empty_res: Vec<i32> = run_staggered_batch(
+            std::iter::empty::<&str>(),
+            |_| (true, 1),
+            || sleeps += 1,
+        );
+        assert!(empty_res.is_empty());
+        assert_eq!(sleeps, 0);
+
+        let single_res = run_staggered_batch(["a"], |item| (true, item), || sleeps += 1);
+        assert_eq!(single_res, vec!["a"]);
+        assert_eq!(sleeps, 0);
+    }
+
+    #[test]
+    fn run_staggered_batch_staggers_multiple_starts_without_trailing_or_double_sleep() {
+        let trace = std::cell::RefCell::new(Vec::<String>::new());
+        let res = run_staggered_batch(
+            ["a", "b", "c"],
+            |item| {
+                trace.borrow_mut().push(format!("start:{item}"));
+                (true, item)
+            },
+            || trace.borrow_mut().push("sleep".to_string()),
+        );
+        assert_eq!(res, vec!["a", "b", "c"]);
+        assert_eq!(
+            *trace.borrow(),
+            vec!["start:a", "sleep", "start:b", "sleep", "start:c"]
+        );
+
+        let fail_trace = std::cell::RefCell::new(Vec::<String>::new());
+        let fail_res = run_staggered_batch(
+            ["a", "b", "c"],
+            |item| {
+                if item == "b" {
+                    fail_trace.borrow_mut().push("fail:b".to_string());
+                    (false, "err")
+                } else {
+                    fail_trace.borrow_mut().push(format!("start:{item}"));
+                    (true, item)
+                }
+            },
+            || fail_trace.borrow_mut().push("sleep".to_string()),
+        );
+        assert_eq!(fail_res, vec!["a", "err", "c"]);
+        assert_eq!(
+            *fail_trace.borrow(),
+            vec!["start:a", "sleep", "fail:b", "start:c"]
         );
     }
 }

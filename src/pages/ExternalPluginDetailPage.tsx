@@ -15,6 +15,7 @@ import { PluginMonogram } from "../components/BrandMark";
 import { MOTION_EASE, MOTION_SPRING } from "../components/MotionPrimitives";
 import { ReleaseNotes } from "../components/ReleaseNotes";
 import { formatBytes, formatErrorMessage, formatVersionText } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import { ipc, isTauriRuntime } from "../lib/ipc";
 import type {
   PluginRuntimeStatus,
@@ -355,6 +356,7 @@ export function ExternalPluginDetailPage({
   onOpenUrl,
   onToast,
 }: ExternalPluginDetailPageProps) {
+  const { lang, t } = useI18n();
   const prefersReduced = useReducedMotion();
   const [settingsData, setSettingsData] = useState<PluginSettingsPageData | null>(null);
   const [loadingSettings, setLoadingSettings] = useState<boolean>(() => Boolean(plugin.hasSettings));
@@ -427,6 +429,20 @@ export function ExternalPluginDetailPage({
       "*",
     );
   }, [isDark]);
+
+  // Push live language changes into the iframe
+  useEffect(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      {
+        source: "agy-manager-host",
+        type: "language-changed",
+        language: lang,
+      },
+      "*",
+    );
+  }, [lang]);
 
   // Push live running status changes into the iframe
   useEffect(() => {
@@ -501,7 +517,9 @@ export function ExternalPluginDetailPage({
           );
           if (!silent) {
             onToastRef.current?.(
-              saved.restarted ? "设置已保存并热重载插件" : "插件设置已保存",
+              saved.restarted
+                ? t("设置已保存并热重载插件", "Settings saved and plugin reloaded")
+                : t("插件设置已保存", "Plugin settings saved"),
               "ok",
             );
           }
@@ -518,7 +536,10 @@ export function ExternalPluginDetailPage({
             "*",
           );
           if (!silent) {
-            onToastRef.current?.(`保存插件设置失败：${errMsg}`, "error");
+            onToastRef.current?.(
+              t(`保存插件设置失败：${errMsg}`, `Failed to save plugin settings: ${errMsg}`),
+              "error",
+            );
           }
         }
       }
@@ -526,7 +547,7 @@ export function ExternalPluginDetailPage({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [plugin.id]);
+  }, [plugin.id, t]);
 
   const composedSrcDoc = useMemo(() => {
     if (!settingsData?.hasSettings || !settingsData.html.trim()) return "";
@@ -546,23 +567,23 @@ export function ExternalPluginDetailPage({
   const enabled = plugin.enabled !== false;
 
   let statusColor = "var(--text-faint)";
-  let statusText = "○ 待命";
+  let statusText = t("○ 待命", "○ Idle");
   if (running) {
     statusColor = "var(--ok)";
-    const pidPart = pids.length > 0 ? ` · 进程 ${pids.join(", ")}` : "";
-    const memPart = memBytes > 0 ? ` · 内存 ${formatBytes(memBytes)}` : "";
-    statusText = `● 运行中${pidPart}${memPart}`;
+    const pidPart = pids.length > 0 ? t(` · 进程 ${pids.join(", ")}`, ` · PID ${pids.join(", ")}`) : "";
+    const memPart = memBytes > 0 ? t(` · 内存 ${formatBytes(memBytes)}`, ` · Memory ${formatBytes(memBytes)}`) : "";
+    statusText = `${t("● 运行中", "● Running")}${pidPart}${memPart}`;
   } else if (!enabled) {
     statusColor = "var(--warn)";
-    statusText = "已禁用";
+    statusText = t("已禁用", "Disabled");
   }
 
-  let healthText = "命令行特征监测";
+  let healthText = t("命令行特征监测", "Process match monitor");
   const health = plugin.health;
   if (health && typeof health === "object" && "port" in health && health.port) {
-    healthText = `HTTP :${String(health.port)} 正常`;
+    healthText = t(`HTTP :${String(health.port)} 正常`, `HTTP :${String(health.port)} OK`);
   } else if (health) {
-    healthText = "通过";
+    healthText = t("通过", "Healthy");
   }
 
   const fullCommand = `${plugin.command || ""} ${(plugin.launchArgs ?? []).join(" ")}`.trim() || "-";
@@ -578,7 +599,7 @@ export function ExternalPluginDetailPage({
           className="group inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
         >
           <ArrowLeft className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-0.5" />
-          <span>返回我的插件</span>
+          <span>{t("返回我的插件", "Back to Plugins")}</span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -588,7 +609,7 @@ export function ExternalPluginDetailPage({
             className="agy-btn-danger-ghost"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>移除</span>
+            <span>{t("移除", "Remove")}</span>
           </button>
         </div>
       </div>
@@ -614,14 +635,14 @@ export function ExternalPluginDetailPage({
                 {plugin.name || plugin.id}
               </h1>
               <span
-                title={`插件编号：${plugin.id}`}
+                title={t(`插件编号：${plugin.id}`, `Plugin ID: ${plugin.id}`)}
                 className="shrink-0 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface-soft)] px-2 py-[2px] font-mono-code text-[11.5px] text-[var(--text-muted)]"
               >
                 ID: {plugin.id}
               </span>
             </div>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-muted)]">
-              {plugin.description || "外部托管插件"}
+              {plugin.description || t("外部托管插件", "External managed plugin")}
             </p>
             <div
               className="mt-2 text-[12.5px] font-semibold tabular-nums"
@@ -642,7 +663,7 @@ export function ExternalPluginDetailPage({
               className="agy-btn-primary"
             >
               <Play className="h-3.5 w-3.5" />
-              <span>{running ? "运行中" : "启动"}</span>
+              <span>{running ? t("运行中", "Running") : t("启动", "Start")}</span>
             </button>
             <button
               type="button"
@@ -651,7 +672,7 @@ export function ExternalPluginDetailPage({
               className="agy-btn"
             >
               <RotateCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
-              <span>重启</span>
+              <span>{t("重启", "Restart")}</span>
             </button>
             <button
               type="button"
@@ -660,7 +681,7 @@ export function ExternalPluginDetailPage({
               className="agy-btn"
             >
               <Square className="h-3.5 w-3.5" />
-              <span>停止</span>
+              <span>{t("停止", "Stop")}</span>
             </button>
             <button
               type="button"
@@ -668,7 +689,7 @@ export function ExternalPluginDetailPage({
               className="agy-btn"
             >
               <ScrollText className="h-3.5 w-3.5" />
-              <span>实时日志</span>
+              <span>{t("实时日志", "Live Logs")}</span>
             </button>
             {remoteRelease?.hasUpdate && onUpdateRemote && (
               <button
@@ -680,8 +701,11 @@ export function ExternalPluginDetailPage({
                 <Download className="h-3.5 w-3.5" />
                 <span>
                   {updatingRemote
-                    ? "更新中..."
-                    : `更新到 ${formatVersionText(remoteRelease.version)}`}
+                    ? t("更新中...", "Updating...")
+                    : t(
+                        `更新到 ${formatVersionText(remoteRelease.version)}`,
+                        `Update to ${formatVersionText(remoteRelease.version)}`,
+                      )}
                 </span>
               </button>
             )}
@@ -691,13 +715,13 @@ export function ExternalPluginDetailPage({
             <LayoutGroup id={`ext-plugin-view-${plugin.id}`}>
               <div
                 role="tablist"
-                aria-label="切换插件设置与插件详情"
+                aria-label={t("切换插件设置与插件详情", "Switch between plugin settings and details")}
                 className="inline-flex h-8 shrink-0 items-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-0.5"
               >
                 {(
                   [
-                    ["settings", "插件设置"],
-                    ["detail", "插件详情"],
+                    ["settings", t("插件设置", "Settings")],
+                    ["detail", t("插件详情", "Details")],
                   ] as const
                 ).map(([key, label]) => {
                   const active = effectiveTab === key;
@@ -730,7 +754,7 @@ export function ExternalPluginDetailPage({
           )}
         </div>
 
-        {/* Section Body: Settings View (kept mounted to prevent iframe reload flicker) vs Detail View */}
+        {/* Section Body */}
         {supportsSettings && (
           <div
             className={
@@ -740,26 +764,26 @@ export function ExternalPluginDetailPage({
             {loadingSettings && !composedSrcDoc ? (
               <div className="agy-inset flex min-h-[220px] items-center justify-center gap-2 p-6 text-[13px] text-[var(--text-muted)]">
                 <RefreshCw className="h-4 w-4 animate-spin text-[var(--accent)]" />
-                <span>正在加载插件设置界面...</span>
+                <span>{t("正在加载插件设置界面...", "Loading plugin settings...")}</span>
               </div>
             ) : settingsError ? (
               <div className="agy-inset flex min-h-[200px] flex-col items-center justify-center gap-2.5 p-6 text-center">
                 <p className="text-[13px] text-[var(--danger)]">
-                  加载插件设置页失败：{settingsError}
+                  {t(`加载插件设置页失败：${settingsError}`, `Failed to load settings page: ${settingsError}`)}
                 </p>
                 <button
                   type="button"
                   onClick={() => void fetchSettingsPage()}
                   className="agy-btn text-[12px]"
                 >
-                  重试
+                  {t("重试", "Retry")}
                 </button>
               </div>
             ) : (
               <div className="agy-inset p-3.5">
                 <iframe
                   ref={iframeRef}
-                  title={`${plugin.name || plugin.id} 设置页`}
+                  title={t(`${plugin.name || plugin.id} 设置页`, `${plugin.name || plugin.id} settings`)}
                   sandbox="allow-scripts"
                   scrolling="no"
                   srcDoc={composedSrcDoc}
@@ -784,39 +808,44 @@ export function ExternalPluginDetailPage({
               {remoteRelease && (remoteRelease.hasUpdate || remoteRelease.changelog.trim()) && (
                 <section className="agy-inset space-y-2.5 p-5">
                   <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-                    {formatVersionText(remoteRelease.version)} 更新日志
+                    {t(
+                      `${formatVersionText(remoteRelease.version)} 更新日志`,
+                      `${formatVersionText(remoteRelease.version)} Changelog`,
+                    )}
                   </h3>
                   {remoteRelease.changelog.trim() ? (
                     <ReleaseNotes text={remoteRelease.changelog} onOpenUrl={onOpenUrl} />
                   ) : (
-                    <p className="text-[13px] text-[var(--text-muted)]">此版本暂无更新日志</p>
+                    <p className="text-[13px] text-[var(--text-muted)]">
+                      {t("此版本暂无更新日志", "No changelog for this release")}
+                    </p>
                   )}
                 </section>
               )}
 
               {/* Spec Grid */}
               <div className="agy-inset space-y-3 p-5">
-                <SpecRow label="插件 ID" value={plugin.id} mono />
-                <SpecRow label="作者" value={plugin.author?.trim() || "未填写"} />
-                <SpecRow label="当前版本" value={formatVersionText(plugin.version)} mono />
-                <SpecRow label="运行类型" value={plugin.type || "custom-cdp"} mono />
+                <SpecRow label={t("插件 ID", "Plugin ID")} value={plugin.id} mono />
+                <SpecRow label={t("作者", "Author")} value={plugin.author?.trim() || t("未填写", "Unspecified")} />
+                <SpecRow label={t("当前版本", "Version")} value={formatVersionText(plugin.version)} mono />
+                <SpecRow label={t("运行类型", "Runtime Type")} value={plugin.type || "custom-cdp"} mono />
                 {plugin.installSource && (
-                  <SpecRow label="安装来源" value={plugin.installSource} mono />
+                  <SpecRow label={t("安装来源", "Source")} value={plugin.installSource} mono />
                 )}
                 {plugin.homepage?.trim() && (
                   <SpecRow
-                    label="项目主页"
+                    label={t("项目主页", "Homepage")}
                     value={plugin.homepage.trim()}
                     mono
                     onClick={onOpenUrl ? () => onOpenUrl(plugin.homepage!.trim()) : undefined}
                   />
                 )}
                 <SpecRow
-                  label="命令状态"
-                  value={plugin.executableExists !== false ? "可执行" : "未找到可执行文件"}
+                  label={t("命令状态", "Executable")}
+                  value={plugin.executableExists !== false ? t("可执行", "Available") : t("未找到可执行文件", "Executable not found")}
                 />
-                <SpecRow label="健康监测" value={healthText} />
-                <SpecRow label="启动命令" value={fullCommand} mono selectAll />
+                <SpecRow label={t("健康监测", "Health Check")} value={healthText} />
+                <SpecRow label={t("启动命令", "Command")} value={fullCommand} mono selectAll />
               </div>
             </motion.div>
           )}

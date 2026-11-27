@@ -14,6 +14,7 @@ import { NativeMcpTab } from "../components/NativeMcpTab";
 import { NativeRulesTab } from "../components/NativeRulesTab";
 import { NativeSkillsTab } from "../components/NativeSkillsTab";
 import { formatErrorMessage } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import { ipc, isTauriRuntime } from "../lib/ipc";
 import type {
   McpOverview,
@@ -46,6 +47,7 @@ export function NativeExtensionsPage({
   onOpenUrl,
   onToast,
 }: NativeExtensionsPageProps) {
+  const { t } = useI18n();
   const [pluginQuery, setPluginQuery] = useState("");
   const [pluginFilter, setPluginFilter] = useState<NativePluginFilter>("all");
   const [togglingDir, setTogglingDir] = useState<string | null>(null);
@@ -71,11 +73,11 @@ export function NativeExtensionsPage({
       const res = await ipc.getMcpOverview();
       setMcpOverview(res);
     } catch (err) {
-      onToast(`加载 MCP 服务失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`加载 MCP 服务失败：${formatErrorMessage(err)}`, `Failed to load MCP servers: ${formatErrorMessage(err)}`), "error");
     } finally {
       setMcpLoading(false);
     }
-  }, [onToast]);
+  }, [onToast, t]);
 
   const loadSkills = useCallback(async () => {
     if (!isTauriRuntime()) return;
@@ -84,11 +86,11 @@ export function NativeExtensionsPage({
       const res = await ipc.listSkills();
       setSkills(res);
     } catch (err) {
-      onToast(`加载 Skills 失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`加载 Skills 失败：${formatErrorMessage(err)}`, `Failed to load skills: ${formatErrorMessage(err)}`), "error");
     } finally {
       setSkillsLoading(false);
     }
-  }, [onToast]);
+  }, [onToast, t]);
 
   const loadRules = useCallback(async () => {
     if (!isTauriRuntime()) return;
@@ -97,11 +99,11 @@ export function NativeExtensionsPage({
       const res = await ipc.listProjectRules();
       setRulesOverview(res);
     } catch (err) {
-      onToast(`扫描项目规则失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`扫描项目规则失败：${formatErrorMessage(err)}`, `Failed to scan project rules: ${formatErrorMessage(err)}`), "error");
     } finally {
       setRulesLoading(false);
     }
-  }, [onToast]);
+  }, [onToast, t]);
 
   const refreshAllNativeAssets = useCallback(async () => {
     if (!isTauriRuntime()) return;
@@ -123,11 +125,11 @@ export function NativeExtensionsPage({
     try {
       const added = await ipc.pickNativeProject();
       if (added) {
-        onToast("已添加项目目录", "ok");
+        onToast(t("已添加项目目录", "Project folder added"), "ok");
         await Promise.all([loadMcp(), loadSkills(), loadRules()]);
       }
     } catch (err) {
-      onToast(`添加项目失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`添加项目失败：${formatErrorMessage(err)}`, `Failed to add project: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -136,11 +138,16 @@ export function NativeExtensionsPage({
     try {
       const next = await ipc.toggleNativePlugin(plugin.dir, enabled);
       onNativePluginsUpdated(next);
-      onToast(`原生扩展「${plugin.name}」已${enabled ? "启用" : "禁用"}`, "ok");
-      // Refresh MCP status since plugin-bundled MCPs follow parent plugin state
+      onToast(
+        t(
+          `原生扩展「${plugin.name}」已${enabled ? "启用" : "禁用"}`,
+          `Native extension "${plugin.name}" ${enabled ? "enabled" : "disabled"}`,
+        ),
+        "ok",
+      );
       loadMcp();
     } catch (err) {
-      onToast(`切换扩展状态失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`切换扩展状态失败：${formatErrorMessage(err)}`, `Failed to toggle extension: ${formatErrorMessage(err)}`), "error");
     } finally {
       setTogglingDir(null);
     }
@@ -154,11 +161,14 @@ export function NativeExtensionsPage({
       const next = await ipc.deleteNativePlugin(plugin.dir, recycleBin);
       setDeletePluginTarget(null);
       onNativePluginsUpdated(next);
-      onToast(`已卸载原生扩展「${plugin.name}」`, "ok");
+      onToast(
+        t(`已卸载原生扩展「${plugin.name}」`, `Uninstalled native extension "${plugin.name}"`),
+        "ok",
+      );
       await Promise.all([loadMcp(), loadSkills()]);
     } catch (err) {
       setDeletePluginTarget(null);
-      onToast(`卸载扩展失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`卸载扩展失败：${formatErrorMessage(err)}`, `Failed to uninstall extension: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -174,7 +184,7 @@ export function NativeExtensionsPage({
         // ignore fallback
       }
     }
-    onToast("未定位到 ~/.gemini/config/plugins 目录", "info");
+    onToast(t("未定位到 ~/.gemini/config/plugins 目录", "Could not locate ~/.gemini/config/plugins"), "info");
   };
 
   const filteredPlugins = useMemo(() => {
@@ -205,16 +215,16 @@ export function NativeExtensionsPage({
   );
 
   const subTabOptions: Array<{ key: NativeSubTabId; label: string; count: number }> = [
-    { key: "plugins", label: "原生扩展", count: nativePlugins.length },
-    { key: "mcp", label: "MCP 服务", count: mcpOverview?.servers.length ?? 0 },
-    { key: "skills", label: "Skills 技能", count: skills.length },
-    { key: "rules", label: "项目规则", count: totalRuleFileCount },
+    { key: "plugins", label: t("原生扩展", "Extensions"), count: nativePlugins.length },
+    { key: "mcp", label: t("MCP 服务", "MCP Servers"), count: mcpOverview?.servers.length ?? 0 },
+    { key: "skills", label: t("Skills 技能", "Skills"), count: skills.length },
+    { key: "rules", label: t("项目规则", "Rules"), count: totalRuleFileCount },
   ];
 
   const pluginFilterOptions: Array<{ key: NativePluginFilter; label: string; count: number }> = [
-    { key: "all", label: "全部", count: nativePlugins.length },
-    { key: "enabled", label: "已启用", count: enabledPluginCount },
-    { key: "disabled", label: "已禁用", count: nativePlugins.length - enabledPluginCount },
+    { key: "all", label: t("全部", "All"), count: nativePlugins.length },
+    { key: "enabled", label: t("已启用", "Enabled"), count: enabledPluginCount },
+    { key: "disabled", label: t("已禁用", "Disabled"), count: nativePlugins.length - enabledPluginCount },
   ];
 
   return (
@@ -222,7 +232,9 @@ export function NativeExtensionsPage({
       {/* Unified Top Section Header */}
       <div className="agy-card flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">AGY 原生管理</h2>
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+            {t("AGY 原生管理", "AGY Native")}
+          </h2>
           <span className="hidden font-mono-code text-[11.5px] text-[var(--text-faint)] xl:inline">
             ~/.gemini/config
           </span>
@@ -233,7 +245,7 @@ export function NativeExtensionsPage({
           value={subTab}
           onChange={onChangeSubTab}
           layoutId="native-sub-tabs"
-          ariaLabel="AGY 原生管理分类"
+          ariaLabel={t("AGY 原生管理分类", "Native management tabs")}
         />
       </div>
 
@@ -246,7 +258,7 @@ export function NativeExtensionsPage({
               <SearchInput
                 value={pluginQuery}
                 onChange={setPluginQuery}
-                placeholder="搜索扩展名称、作者或目录..."
+                placeholder={t("搜索扩展名称、作者或目录...", "Search extension name, author, or folder...")}
                 className="w-[230px]"
               />
               <SegmentedControl
@@ -254,7 +266,7 @@ export function NativeExtensionsPage({
                 value={pluginFilter}
                 onChange={setPluginFilter}
                 layoutId="native-plugin-filter"
-                ariaLabel="筛选原生扩展状态"
+                ariaLabel={t("筛选原生扩展状态", "Filter native extensions")}
               />
             </div>
 
@@ -264,10 +276,10 @@ export function NativeExtensionsPage({
                   type="button"
                   onClick={handleOpenPluginsRoot}
                   className="agy-btn px-2.5 py-1.5 text-[12px]"
-                  title="打开 ~/.gemini/config/plugins"
+                  title={t("打开 ~/.gemini/config/plugins", "Open ~/.gemini/config/plugins")}
                 >
                   <FolderOpen className="h-3.5 w-3.5" />
-                  <span>扩展目录</span>
+                  <span>{t("扩展目录", "Open Folder")}</span>
                 </button>
               )}
               <button
@@ -276,7 +288,7 @@ export function NativeExtensionsPage({
                 className="agy-btn px-2.5 py-1.5 text-[12px]"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                <span>刷新</span>
+                <span>{t("刷新", "Refresh")}</span>
               </button>
             </div>
           </div>
@@ -295,8 +307,8 @@ export function NativeExtensionsPage({
                     className="flex h-full min-h-[200px] items-center justify-center px-6 py-12 text-[13px] text-[var(--text-muted)]"
                   >
                     {nativePlugins.length > 0
-                      ? "未找到匹配的原生扩展"
-                      : "未在 ~/.gemini/config/plugins 发现原生扩展"}
+                      ? t("未找到匹配的原生扩展", "No matching native extensions")
+                      : t("未在 ~/.gemini/config/plugins 发现原生扩展", "No native extensions found in ~/.gemini/config/plugins")}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -330,7 +342,7 @@ export function NativeExtensionsPage({
                             )}
                           </div>
                           <p className="mt-0.5 truncate text-[12.5px] text-[var(--text-muted)]">
-                            {p.description || "内置扩展"}
+                            {p.description || t("内置扩展", "Built-in extension")}
                           </p>
                         </div>
 
@@ -338,7 +350,7 @@ export function NativeExtensionsPage({
                         <div className="hidden shrink-0 items-center gap-1.5 md:flex">
                           {p.skillCount > 0 && (
                             <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
-                              {p.skillCount} 技能
+                              {t(`${p.skillCount} 技能`, `${p.skillCount} Skills`)}
                             </span>
                           )}
                           {p.hasMcp && (
@@ -363,13 +375,16 @@ export function NativeExtensionsPage({
                           onClick={(e) => e.stopPropagation()}
                         >
                           <StatusPill tone={p.enabled ? "ok" : "muted"}>
-                            {p.enabled ? "● 已启用" : "已禁用"}
+                            {p.enabled ? t("● 已启用", "● Enabled") : t("已禁用", "Disabled")}
                           </StatusPill>
 
                           <SpringSwitch
                             checked={p.enabled}
                             disabled={togglingDir === p.dir}
-                            ariaLabel={`${p.enabled ? "禁用" : "启用"}原生扩展 ${p.name}`}
+                            ariaLabel={t(
+                              `${p.enabled ? "禁用" : "启用"}原生扩展 ${p.name}`,
+                              `${p.enabled ? "Disable" : "Enable"} native extension ${p.name}`,
+                            )}
                             onChange={(checked) => handleToggleNativePlugin(p, checked)}
                           />
 
@@ -378,7 +393,7 @@ export function NativeExtensionsPage({
                             onClick={() => onOpenDetail(p.dir)}
                             className="agy-btn shrink-0 px-2.5 py-1 text-[12px]"
                           >
-                            <span>详情</span>
+                            <span>{t("详情", "Details")}</span>
                             <ChevronRight className="h-3.5 w-3.5 opacity-60 transition-transform duration-150 group-hover:translate-x-0.5" />
                           </button>
 
@@ -387,8 +402,8 @@ export function NativeExtensionsPage({
                             onClick={() =>
                               setDeletePluginTarget({ plugin: p, recycleBin: true, busy: false })
                             }
-                            aria-label={`卸载原生扩展 ${p.name}`}
-                            title="卸载此原生扩展"
+                            aria-label={t(`卸载原生扩展 ${p.name}`, `Uninstall native extension ${p.name}`)}
+                            title={t("卸载此原生扩展", "Uninstall this native extension")}
                             className="agy-btn-danger-ghost shrink-0 px-2 py-1 text-[12px]"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -439,16 +454,19 @@ export function NativeExtensionsPage({
 
       <ConfirmModal
         open={Boolean(deletePluginTarget)}
-        title="确认卸载原生扩展"
+        title={t("确认卸载原生扩展", "Uninstall Native Extension")}
         description={
           deletePluginTarget
-            ? `确定卸载 AGY 原生扩展「${deletePluginTarget.plugin.name}」吗？\n\n目录：~/.gemini/config/plugins/${deletePluginTarget.plugin.dir}\n将移除其包含的技能、规则及扩展级 MCP 配置，并清理 config.json 中的记录。`
+            ? t(
+                `确定卸载 AGY 原生扩展「${deletePluginTarget.plugin.name}」吗？\n\n目录：~/.gemini/config/plugins/${deletePluginTarget.plugin.dir}\n将移除其包含的技能、规则及扩展级 MCP 配置，并清理 config.json 中的记录。`,
+                `Uninstall AGY native extension "${deletePluginTarget.plugin.name}"?\n\nDirectory: ~/.gemini/config/plugins/${deletePluginTarget.plugin.dir}\nThis removes its skills, rules, and bundled MCP config, and cleans its entry from config.json.`,
+              )
             : ""
         }
-        confirmLabel="确认卸载"
+        confirmLabel={t("确认卸载", "Uninstall")}
         tone="danger"
         busy={deletePluginTarget?.busy ?? false}
-        checkboxLabel="移入 Windows 回收站（取消勾选将永久删除）"
+        checkboxLabel={t("移入 Windows 回收站（取消勾选将永久删除）", "Move to Windows Recycle Bin (uncheck to delete permanently)")}
         checkboxChecked={deletePluginTarget?.recycleBin ?? true}
         onCheckboxChange={(checked) =>
           setDeletePluginTarget((prev) => (prev ? { ...prev, recycleBin: checked } : null))

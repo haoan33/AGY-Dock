@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Download, Info, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { sanitizePlainText } from "../lib/format";
+import { localizeUpdatePromptButton, useI18n } from "../lib/i18n";
 import type { UpdateCheckResult } from "../types/ipc";
 import { ReleaseNotes } from "./ReleaseNotes";
 import { StatusPill } from "./MotionPrimitives";
@@ -72,15 +73,16 @@ export function FloatingUpdateBanner({
   onUpdateNow,
   onOpenUrl,
 }: FloatingUpdateBannerProps) {
+  const { isEn, t } = useI18n();
   if (!update) return null;
 
   const latest = sanitizePlainText(update.latestVersion);
   const title =
     sanitizePlainText(update.prompt?.title) ||
-    (latest ? `AGY Dock v${latest} 已发布` : "发现新版本");
+    (latest ? t(`AGY Dock v${latest} 已发布`, `AGY Dock v${latest} is available`) : t("发现新版本", "Update Available"));
   const baseBody =
     sanitizePlainText(update.prompt?.body) ||
-    "前往 HaoAn Lab 官网查看更新日志并获取最新版本。";
+    t("前往 HaoAn Lab 官网查看更新日志并获取最新版本。", "Visit HaoAn Lab to view the changelog and download the latest version.");
   const changelog = update.changelog?.trim();
 
   return (
@@ -98,12 +100,12 @@ export function FloatingUpdateBanner({
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-5 py-3">
             <StatusPill tone="ok">
               <Download className="h-3 w-3" />
-              <span>{latest ? `新版本 v${latest}` : "发现新版本"}</span>
+              <span>{latest ? t(`新版本 v${latest}`, `New v${latest}`) : t("发现新版本", "Update Available")}</span>
             </StatusPill>
             <button
               type="button"
               onClick={onDismiss}
-              aria-label="关闭更新提示"
+              aria-label={t("关闭更新提示", "Dismiss update banner")}
               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
             >
               <X className="h-4 w-4" />
@@ -119,7 +121,9 @@ export function FloatingUpdateBanner({
             </p>
             {changelog && (
               <section className="mt-4 rounded-xl bg-[var(--bg-surface-soft)] px-3.5 py-3">
-                <h5 className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">更新日志</h5>
+                <h5 className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">
+                  {t("更新日志", "Changelog")}
+                </h5>
                 <ReleaseNotes text={changelog} onOpenUrl={onOpenUrl} />
               </section>
             )}
@@ -131,14 +135,14 @@ export function FloatingUpdateBanner({
               onClick={onDismiss}
               className="cursor-pointer px-1 py-1 text-[12.5px] font-semibold text-[var(--link)] hover:underline"
             >
-              暂不更新
+              {t("暂不更新", "Later")}
             </button>
             <button
               type="button"
               onClick={() => onUpdateNow(update.updateUrl)}
               className="agy-btn-primary py-1.5 text-[12.5px]"
             >
-              {sanitizePlainText(update.prompt?.button) || "立即更新"}
+              {localizeUpdatePromptButton(sanitizePlainText(update.prompt?.button), isEn)}
             </button>
           </div>
         </motion.aside>

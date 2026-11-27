@@ -1,5 +1,6 @@
 import type { StorageInventory, StorageNode } from "../types/ipc";
 import { basename } from "./format";
+import { tr } from "./i18n";
 
 export function canDrillStorageNode(node: StorageNode) {
   return Boolean(node.lazyChildren || node.children.length);
@@ -47,8 +48,18 @@ export function buildProjectStorageTree(
         category: "code",
         path: folder.path,
         subtitle: project.folders.length > 1 ? `${folder.path} · ${project.name}` : folder.path,
-        purposeDesc: canRead ? "可清理整个项目目录，或展开后选择其中的文件。" : "项目目录暂时无法读取。",
-        deletabilityLabel: folder.status === "partial" ? "部分可读" : canRead ? "项目目录" : "不可访问",
+        purposeDesc: canRead
+          ? tr(
+              "可清理整个项目目录，或展开后选择其中的文件。",
+              "Clean the entire project folder, or expand to select specific files inside.",
+            )
+          : tr("项目目录暂时无法读取。", "Project folder is temporarily unreadable."),
+        deletabilityLabel:
+          folder.status === "partial"
+            ? tr("部分可读", "Partially Readable")
+            : canRead
+              ? tr("项目目录", "Project Folder")
+              : tr("不可访问", "Inaccessible"),
         sizeBytes: loaded?.sizeBytes ?? folder.sizeBytes,
         fileCount: loaded?.fileCount ?? folder.fileCount,
         mtime: folder.mtime,
@@ -87,9 +98,12 @@ export function buildProjectStorageTree(
   return {
     ...projectNodeDefaults,
     nodeId: "root:projects",
-    name: "项目文件",
+    name: tr("项目文件", "Project Files"),
     kind: "root",
-    purposeDesc: "所有已发现和手动添加的项目目录，重叠路径在合计中只计一次。",
+    purposeDesc: tr(
+      "所有已发现和手动添加的项目目录，重叠路径在合计中只计一次。",
+      "All discovered and manually added project folders. Overlapping paths are counted once in totals.",
+    ),
     sizeBytes,
     fileCount,
     children,

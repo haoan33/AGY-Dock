@@ -1,6 +1,7 @@
 import { Search, X } from "lucide-react";
 import type { MouseEvent } from "react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
+import { useI18n } from "../lib/i18n";
 
 export const MOTION_EASE = [0.22, 1, 0.36, 1] as const;
 export const MOTION_SPRING = {
@@ -22,11 +23,13 @@ interface SearchInputProps {
 export function SearchInput({
   value,
   onChange,
-  placeholder = "搜索...",
+  placeholder,
   className = "",
   inputClassName = "",
   ariaLabel,
 }: SearchInputProps) {
+  const { t } = useI18n();
+  const resolvedPlaceholder = placeholder ?? t("搜索...", "Search...");
   return (
     <div className={`relative flex items-center ${className}`}>
       <Search
@@ -43,8 +46,8 @@ export function SearchInput({
             onChange("");
           }
         }}
-        placeholder={placeholder}
-        aria-label={ariaLabel || placeholder}
+        placeholder={resolvedPlaceholder}
+        aria-label={ariaLabel || resolvedPlaceholder}
         className={`agy-input agy-search-input w-full pl-9 ${value ? "pr-8" : "pr-3"} ${inputClassName}`}
       />
       <AnimatePresence initial={false}>
@@ -52,8 +55,8 @@ export function SearchInput({
           <motion.button
             key="search-clear"
             type="button"
-            aria-label="清空搜索"
-            title="清空搜索"
+            aria-label={t("清空搜索", "Clear search")}
+            title={t("清空搜索", "Clear search")}
             initial={{ opacity: 0, scale: 0.75 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.75 }}
@@ -332,16 +335,17 @@ export function TopologyDiagram({
   natEnabled,
   natTotal,
 }: TopologyDiagramProps) {
+  const { t } = useI18n();
   const hostActive = cdpReady;
   const extActive = extRunning > 0;
   const conduitActive = cdpReady || extActive;
 
   const hostSub =
     cdpReady && port
-      ? `端口 ${port}`
+      ? t(`端口 ${port}`, `Port ${port}`)
       : mainCount > 0
-        ? `${mainCount} 个主窗口`
-        : "未运行";
+        ? t(`${mainCount} 个主窗口`, `${mainCount} window(s)`)
+        : t("未运行", "Not running");
 
   // SVG coordinate system 540x206 for crisp responsive scaling
   const hostPathTop = "M 184 103 C 248 103, 248 58, 312 58";
@@ -353,7 +357,7 @@ export function TopologyDiagram({
         viewBox="0 0 540 206"
         className="h-full max-h-[224px] w-full select-none"
         role="img"
-        aria-label="Antigravity 运行拓扑架构图"
+        aria-label={t("Antigravity 运行拓扑架构图", "Antigravity runtime topology diagram")}
       >
         <defs>
           <filter id="agy-soft-glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -485,7 +489,7 @@ export function TopologyDiagram({
           />
           <circle cx="330" cy="58" r="4.5" fill={extActive ? "var(--ok)" : "var(--text-faint)"} />
           <text x="344" y="53" fontSize="13" fontWeight="600" fill="var(--text-primary)">
-            外部托管沙盒
+            {t("外部托管沙盒", "External Sandbox")}
           </text>
           <text
             x="344"
@@ -494,7 +498,7 @@ export function TopologyDiagram({
             fontWeight="500"
             fill={extActive ? "var(--ok)" : "var(--text-muted)"}
           >
-            {extRunning} / {extTotal} 运行中
+            {t(`${extRunning} / ${extTotal} 运行中`, `${extRunning} / ${extTotal} running`)}
           </text>
         </g>
 
@@ -512,10 +516,10 @@ export function TopologyDiagram({
           />
           <circle cx="330" cy="148" r="4.5" fill={natEnabled > 0 ? "var(--info)" : "var(--text-faint)"} />
           <text x="344" y="143" fontSize="13" fontWeight="600" fill="var(--text-primary)">
-            原生扩展清单
+            {t("原生扩展清单", "Native Extensions")}
           </text>
           <text x="344" y="162" fontSize="11.5" fontWeight="500" fill="var(--text-muted)">
-            {natEnabled} / {natTotal} 已启用
+            {t(`${natEnabled} / ${natTotal} 已启用`, `${natEnabled} / ${natTotal} enabled`)}
           </text>
         </g>
       </svg>

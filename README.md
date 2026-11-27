@@ -1,4 +1,4 @@
-# AGY Dock (`AGY-Dock` v2.9.5)
+# AGY Dock (`AGY-Dock` v2.10.0)
 
 **AGY Dock** (formerly *AGY Plugin Manager* / `AGY-Launcher`) is a decoupled Windows desktop control center, process supervisor, and Chrome DevTools Protocol (CDP) bridge launcher for **Google Antigravity IDE**.
 
@@ -56,14 +56,14 @@ Each package carries a root `agy-plugin.json` manifest (`schemaVersion: 1`). See
 
 ### Option 1: Standalone Windows Setup Installer (Recommended)
 
-1. Download or build `dist-release/AGY-Dock-Setup-v2.9.5.exe`.
+1. Download or build `dist-release/AGY-Dock-Setup-v2.10.0.exe`.
 2. Run the setup wizard:
    - Automatically detects your local `Antigravity.exe` installation (with manual browse override).
    - Installs clean manager binaries to `%LOCALAPPDATA%\AGY-Plugin-Manager` by default while preserving existing configurations and plugins on upgrade.
    - Creates **Desktop** and **Start Menu** shortcuts (`AGY Dock`), then launches immediately.
 3. Silent installation for automation or CI:
    ```powershell
-   .\AGY-Dock-Setup-v2.9.5.exe /S
+   .\AGY-Dock-Setup-v2.10.0.exe /S
    ```
 
 ### Option 2: Installing Plugins (Marketplace or Drag-and-Drop)

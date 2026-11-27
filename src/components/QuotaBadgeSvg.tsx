@@ -1,5 +1,10 @@
 import { useCallback, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  localizeQuotaResetIn,
+  localizeWeeklyForecastLabel,
+  useI18n,
+} from "../lib/i18n";
 import type { QuotaPoolSnapshot } from "../types/ipc";
 
 interface QuotaBadgeSvgProps {
@@ -91,6 +96,7 @@ export function QuotaBadgeSvg({
   size = 38,
   interactive = true,
 }: QuotaBadgeSvgProps) {
+  const { isEn, t } = useI18n();
   const [tip, setTip] = useState<TipState | null>(null);
   const baseId = useId();
 
@@ -116,16 +122,20 @@ export function QuotaBadgeSvg({
     wkForecast?.status === "tight" || wkForecast?.status === "exhausted";
 
   const arcs = useMemo<ArcSpec[]>(() => {
+    const wkLabel = wkForecast ? localizeWeeklyForecastLabel(wkForecast, isEn) : "";
+    const wkResetIn = localizeQuotaResetIn(pool.weekly, isEn);
+    const fiveHourResetIn = localizeQuotaResetIn(pool.fiveHour, isEn);
+
     if (isArgon) {
       const pct = pool.weekly.percent ?? 0;
       const untouched = pool.weekly.available && (pct === 100 || !pool.weekly.resetIn);
       const burn =
         wkForecast?.dailyBurnPct !== null && wkForecast?.dailyBurnPct !== undefined
-          ? `-${wkForecast.dailyBurnPct}%/天`
+          ? t(`-${wkForecast.dailyBurnPct}%/天`, `-${wkForecast.dailyBurnPct}%/day`)
           : "";
       const subParts = untouched
-        ? ["未使用"]
-        : [wkForecast?.label, burn, pool.weekly.resetIn].filter(Boolean);
+        ? [t("未使用", "Unused")]
+        : [wkLabel, burn, wkResetIn].filter(Boolean);
       return [
         {
           kind: "top",
@@ -133,8 +143,11 @@ export function QuotaBadgeSvg({
           endDeg: TOP_END,
           pct,
           isLow: pct > 0 && (pct <= 25 || wkWarn),
-          tipTitle: `Argon 周额度 ${pool.weekly.available ? `${pct}%` : "--"}`,
-          tipSub: subParts.join(" · ") || "Pro 独立周池",
+          tipTitle: t(
+            `Argon 周额度 ${pool.weekly.available ? `${pct}%` : "--"}`,
+            `Argon Weekly Quota ${pool.weekly.available ? `${pct}%` : "--"}`,
+          ),
+          tipSub: subParts.join(" · ") || t("Pro 独立周池", "Pro Dedicated Weekly Pool"),
         },
       ];
     }
@@ -142,15 +155,18 @@ export function QuotaBadgeSvg({
     const hourPct = pool.fiveHour.percent ?? 0;
     const wkPct = pool.weekly.percent ?? 0;
     const hourTipSub = !pool.fiveHour.available
-      ? "暂无数据"
+      ? t("暂无数据", "No data")
       : pool.fiveHour.percent === 100 || !pool.fiveHour.resetIn
-        ? "未使用"
-        : `${pool.fiveHour.resetIn}重置 (${pool.fiveHour.resetClock})`;
+        ? t("未使用", "Unused")
+        : t(
+            `${fiveHourResetIn}重置 (${pool.fiveHour.resetClock})`,
+            `Resets ${fiveHourResetIn} (${pool.fiveHour.resetClock})`,
+          );
     const wkTipSub = !pool.weekly.available
-      ? "暂无数据"
+      ? t("暂无数据", "No data")
       : pool.weekly.percent === 100 || (!pool.weekly.resetIn && !wkForecast)
-        ? "未使用"
-        : [wkForecast?.label, pool.weekly.resetIn].filter(Boolean).join(" · ") || "暂无数据";
+        ? t("未使用", "Unused")
+        : [wkLabel, wkResetIn].filter(Boolean).join(" · ") || t("暂无数据", "No data");
     return [
       {
         kind: "top",
@@ -158,7 +174,10 @@ export function QuotaBadgeSvg({
         endDeg: TOP_END,
         pct: hourPct,
         isLow: hourPct > 0 && hourPct <= 25,
-        tipTitle: `5 小时额度 ${pool.fiveHour.available ? `${hourPct}%` : "--"}`,
+        tipTitle: t(
+          `5 小时额度 ${pool.fiveHour.available ? `${hourPct}%` : "--"}`,
+          `5-Hour Quota ${pool.fiveHour.available ? `${hourPct}%` : "--"}`,
+        ),
         tipSub: hourTipSub,
       },
       {
@@ -167,27 +186,30 @@ export function QuotaBadgeSvg({
         endDeg: BOT_END,
         pct: wkPct,
         isLow: wkPct > 0 && (wkPct <= 25 || wkWarn),
-        tipTitle: `周额度 ${pool.weekly.available ? `${wkPct}%` : "--"}`,
+        tipTitle: t(
+          `周额度 ${pool.weekly.available ? `${wkPct}%` : "--"}`,
+          `Weekly Quota ${pool.weekly.available ? `${wkPct}%` : "--"}`,
+        ),
         tipSub: wkTipSub,
       },
     ];
-  }, [isArgon, pool, wkForecast, wkWarn]);
+  }, [isArgon, isEn, pool, t, wkForecast, wkWarn]);
 
   const centerTip = useMemo(() => {
     if (isArgon) {
-      return { title: "Gemini Argon", sub: "Pro 独立周额度" };
+      return { title: "Gemini Argon", sub: t("Pro 独立周额度", "Pro Dedicated Weekly Quota") };
     }
     if (pool.badgeKind === "claude-gpt") {
       return {
         title: "Claude & GPT",
-        sub: pool.models.slice(0, 3).join(" · ") || "第三方模型共享池",
+        sub: pool.models.slice(0, 3).join(" · ") || t("第三方模型共享池", "Third-party Shared Pool"),
       };
     }
     return {
       title: "Gemini",
-      sub: pool.models.slice(0, 3).join(" · ") || "5h + 周共享池",
+      sub: pool.models.slice(0, 3).join(" · ") || t("5h + 周共享池", "5h + Weekly Shared Pool"),
     };
-  }, [isArgon, pool]);
+  }, [isArgon, pool, t]);
 
   const tipStyle = useMemo(() => {
     if (!tip) return undefined;
@@ -254,9 +276,13 @@ export function QuotaBadgeSvg({
         {isArgon && (
           <g
             className="agy-argon-group"
-            onMouseEnter={(e) => showTip(e.currentTarget, "Gemini Argon", "Pro 独立周额度标识")}
+            onMouseEnter={(e) =>
+              showTip(e.currentTarget, "Gemini Argon", t("Pro 独立周额度标识", "Pro Dedicated Weekly Quota Badge"))
+            }
             onMouseLeave={hideTip}
-            onFocus={(e) => showTip(e.currentTarget, "Gemini Argon", "Pro 独立周额度标识")}
+            onFocus={(e) =>
+              showTip(e.currentTarget, "Gemini Argon", t("Pro 独立周额度标识", "Pro Dedicated Weekly Quota Badge"))
+            }
             onBlur={hideTip}
           >
             <circle className="agy-argon-dot" cx={ARGON_DOTS.lx} cy={ARGON_DOTS.ly} r="0.95" />
@@ -267,7 +293,7 @@ export function QuotaBadgeSvg({
                 className="agy-argon-hit"
                 tabIndex={0}
                 role="img"
-                aria-label="Gemini Argon 独立周额度标识"
+                aria-label={t("Gemini Argon 独立周额度标识", "Gemini Argon Dedicated Weekly Quota Badge")}
                 d={ARGON_DOTS.hitD}
               />
             )}

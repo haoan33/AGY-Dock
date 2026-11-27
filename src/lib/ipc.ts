@@ -14,6 +14,7 @@ import {
   type DeletePluginResult,
   type FileFilterSpec,
   type InstallPackageResult,
+  type LanguageMode,
   type LaunchResult,
   type LifecycleConfig,
   type LocalPluginPackage,
@@ -52,13 +53,20 @@ import {
   type UpdateCheckResult,
 } from "../types/ipc";
 
+import { tr } from "./i18n";
+
 export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
 async function callCommand<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauriRuntime()) {
-    throw new Error("当前运行在非 Tauri 浏览器环境中，无法调用原生后台命令");
+    throw new Error(
+      tr(
+        "当前运行在非 Tauri 浏览器环境中，无法调用原生后台命令",
+        "Running outside the Tauri desktop runtime; native commands are unavailable",
+      ),
+    );
   }
   return invoke<T>(cmd, args);
 }
@@ -186,8 +194,11 @@ export const ipc = {
   saveLifecycleConfig: (lifecycle: LifecycleConfig) =>
     callCommand<LifecycleConfig>(TAURI_COMMANDS.SAVE_LIFECYCLE_CONFIG, { lifecycle }),
 
-  saveUiPreferences: (prefs: { theme?: ThemeMode; minimizeToTray?: boolean }) =>
-    callCommand<UiPreferences>(TAURI_COMMANDS.SAVE_UI_PREFERENCES, prefs),
+  saveUiPreferences: (prefs: {
+    theme?: ThemeMode;
+    minimizeToTray?: boolean;
+    language?: LanguageMode;
+  }) => callCommand<UiPreferences>(TAURI_COMMANDS.SAVE_UI_PREFERENCES, prefs),
 
   readLogTail: (logId: string, tailLines = 200) =>
     callCommand<LogTailResult>(TAURI_COMMANDS.READ_LOG_TAIL, { logId, tailLines }),
@@ -214,6 +225,8 @@ export const ipc = {
     callCommand<string | null>(TAURI_COMMANDS.PICK_FILE, options ?? {}),
 
   getSystemDarkMode: () => callCommand<boolean>(TAURI_COMMANDS.GET_SYSTEM_DARK_MODE),
+
+  getSystemLanguage: () => callCommand<string>(TAURI_COMMANDS.GET_SYSTEM_LANGUAGE),
 
   getStorageInventory: (rescan: boolean) =>
     callCommand<StorageInventory>(TAURI_COMMANDS.GET_STORAGE_INVENTORY, { rescan }),

@@ -755,7 +755,11 @@ pub fn refresh_marketplace_snapshot_status(
         let key = item.id.to_lowercase();
         if item.tier != "official" && official_ids.contains(&key) {
             item.conflict_blocked = true;
-            item.conflict_reason = "与官方商店插件编号冲突，已禁止覆盖".to_string();
+            item.conflict_reason = crate::i18n::tr(
+                "与官方商店插件编号冲突，已禁止覆盖",
+                "Conflicts with an official store plugin ID; overwriting is blocked",
+            )
+            .to_string();
         }
         let installed_entry = installed_map.get(&key).copied();
         let dir_candidate = paths.plugins_dir.join(&item.id);
@@ -994,9 +998,17 @@ async fn fetch_remote_marketplace_with_api_base(
     }
 
     let message = if source == "catalog" {
-        "已从 GitHub 插件目录同步最新清单".to_string()
+        crate::i18n::tr(
+            "已从 GitHub 插件目录同步最新清单",
+            "Synced latest catalog from GitHub",
+        )
+        .to_string()
     } else {
-        "已从 GitHub Releases 扫描可用插件包".to_string()
+        crate::i18n::tr(
+            "已从 GitHub Releases 扫描可用插件包",
+            "Scanned available packages from GitHub Releases",
+        )
+        .to_string()
     };
 
     let mut out = RemoteMarketplaceResult {

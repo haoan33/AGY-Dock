@@ -6,6 +6,45 @@ Format follows the rules in `AGY-Launcher/AGENTS.md` and Semantic Versioning (`M
 
 ---
 
+## [v2.10.0] - 2026-11-27 22:32
+### Summary
+- Add full English UI localization across all frontend pages, modals, tooltips, charts, status pills, toasts, and backend user-facing strings (Windows tray menu, file picker titles, storage tree/inspector descriptions, MCP/Skills/Rules labels, HaoAn Lab update fallbacks, security scan summary, and marketplace sync messages).
+- Add a **Language / 界面语言** switcher in **Settings** (`System / 跟随系统`, `简体中文`, `English`) that persists `ui.language` in `plugins.json`, applies immediately without restart, live-refreshes the Windows system tray menu, and notifies embedded external plugin settings frames via `language-changed`.
+- Auto-detect the Windows OS display language on first launch (`GetUserDefaultUILanguage` with `HKCU\Control Panel\International\LocaleName` fallback) when `ui.language` is unset, mapping Chinese locales to `zh-CN` and non-Chinese locales to `en`.
+- Bump synchronized version manifests to `2.10.0` (MINOR bump for new user-facing localization capability and optional `ui.language` config key).
+
+### Files Changed
+- `src-tauri/src/i18n.rs` — new OS language detection (`GetUserDefaultUILanguage` + registry fallback), preference normalization, active language flag, `tr(zh, en)` helper, and unit test.
+- `src-tauri/src/models.rs`, `src-tauri/src/config.rs`, `src-tauri/src/commands.rs`, `src-tauri/src/lib.rs`, `src-tauri/src/tray.rs` — `UiPreferences.language`, `get_system_language` command, startup language initialization, live tray menu localization refresh, and localized dialog/toast messages.
+- `src-tauri/src/storage.rs`, `src-tauri/src/storage_inventory.rs`, `src-tauri/src/agy_config.rs`, `src-tauri/src/updater.rs`, `src-tauri/src/security_scan.rs`, `src-tauri/src/marketplace.rs` — localized backend labels, descriptions, update fallbacks, and status summaries while preserving existing Rust test defaults.
+- `src/lib/i18n.tsx`, `src/types/ipc.ts`, `src/lib/ipc.ts`, `src/lib/format.ts`, `src/lib/storage.ts`, `src/main.tsx`, `src/App.tsx` — frontend `I18nProvider`/`useI18n` context, dynamic backend-data localizers, OS language sync on startup, and language preference persistence.
+- `src/pages/*.tsx`, `src/components/*.tsx` — full Chinese/English UI copy across Status, Plugins, Market, Native Extensions, Storage, Logs, Settings (including the new language selector card), Treemap, Quota badges, and all modals/overlays.
+- `VERSION`, `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `AGY-Launcher/server.mjs`, `AGY-Launcher/lib/process-manager.mjs`, `CHANGELOG.md`, `README.md`, `AGY-Launcher/MAINTENANCE_LOG.md` — synchronized `2.10.0` version bump, release notes, and maintenance log.
+
+### Verification
+- `npm run build` (`tsc --noEmit && vite build`) -> built 2281 modules in 5.19s, 0 errors.
+- `node --test scripts/process-plugin-submission.test.mjs AGY-Launcher/tests/process-manager.test.mjs` -> 18 passed, 0 failed.
+- `cargo test --manifest-path src-tauri/Cargo.toml` -> 68 passed, 0 failed (`agy_dock_lib`, including `i18n::tests::normalizes_language_preferences_and_locales`).
+- `npm run build:local` -> built `AGY Dock.exe` in 4m 22s and hot-updated `D:\AGY Dock\AGY Dock.exe` (8.66 MB) without modifying user `plugins.json` or `plugins/`.
+- Source CJK string audit across `src/**/*.{ts,tsx}` -> 0 untranslated UI strings remaining.
+
+## [v2.9.6] - 2026-11-25 23:10
+### Scope & Summary
+- Add staggered plugin startup (`PLUGIN_START_STAGGER = 500ms`) in `src-tauri/src/supervisor.rs` (`run_staggered_batch` + `attach_filtered_plugins`) so batch-started plugins launch sequentially with a 500ms interval instead of bursting concurrently, while skipping delays for disabled/filtered/already-running entries and avoiding double or trailing sleeps.
+- Synchronize the desktop ZIP security scanner (`src-tauri/src/security_scan.rs`) with the cloud scanner (`scripts/scan-plugin.mjs` commits `ffdcc1c` and `c4dae50`): support `-journal`/`-wal`/`-shm` credential basename suffixes, extend backward defensive-denylist context scanning up to 120 lines of pure list entries, block `UNSAFE_ARCHIVE_PATH` zip-slip/absolute/drive entries, enforce bounded decompression + `OVERSIZED_CODE_FILE` blocking (>4 MB non-vendored code files while exempting vendored minified assets), and prefer root/top-level `agy-plugin.json` (`manifest_depth`) to prevent nested manifest spoofing.
+- Bump synchronized local version to `2.9.6` (local build & hot-update only; not pushed to GitHub).
+
+### Files Changed
+- `src-tauri/src/supervisor.rs` — staggered batch plugin startup (`run_staggered_batch`) and unit tests.
+- `src-tauri/src/security_scan.rs` — synced scanner parity rules and regression tests.
+- `VERSION`, `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `AGY-Launcher/server.mjs`, `AGY-Launcher/lib/process-manager.mjs`, `AGY-Launcher/MAINTENANCE_LOG.md` — local `2.9.6` version bump and maintenance log.
+
+### Verification
+- `cargo test --manifest-path src-tauri/Cargo.toml` -> 67 passed, 0 failed (`agy_dock_lib`).
+- `node --test scripts/process-plugin-submission.test.mjs AGY-Launcher/tests/process-manager.test.mjs` -> 18 passed, 0 failed.
+- `npm run build` (`tsc --noEmit && vite build`) -> built 2280 modules in 3.84s, 0 errors.
+- `npm run build:local` -> built `AGY Dock.exe` in 2m 03s and hot-updated `D:\AGY Dock\AGY Dock.exe` (8.63 MB) without modifying user `plugins.json` or `plugins/`.
+
 ## [v2.9.5] - 2026-11-24 21:58
 ### Scope & Summary
 - Publish a clean release commit (`v2.9.5`) without modifying `.github/workflows/*` so GitHub Actions `GITHUB_TOKEN` release creation succeeds cleanly (resolving the `HTTP 403` integration restriction hit by `v2.9.3`/`v2.9.4`), shipping all v2.9.3–v2.9.4 security scanner, official manual review approval, and marketplace workflow fixes in the Windows installer release.

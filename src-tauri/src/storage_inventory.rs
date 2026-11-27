@@ -398,7 +398,7 @@ fn project_folder_preview(
             file_count: size.file_count,
             mtime: mtime_ts(&meta),
             deletability: "caution".into(),
-            deletability_label: "清理前确认".into(),
+            deletability_label: crate::i18n::tr("清理前确认", "Confirm Before Cleaning").into(),
             delete_targets: vec![path],
             ..Default::default()
         });

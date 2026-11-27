@@ -13,6 +13,11 @@ import {
   isCompanionPluginType,
   isSupportedPackagePath,
 } from "./lib/format";
+import {
+  normalizeLanguageMode,
+  normalizeLocaleTag,
+  useI18n,
+} from "./lib/i18n";
 import { events, ipc, isTauriRuntime } from "./lib/ipc";
 import { ExternalPluginDetailPage } from "./pages/ExternalPluginDetailPage";
 import { LogsPage } from "./pages/LogsPage";
@@ -25,6 +30,7 @@ import { StatusPage } from "./pages/StatusPage";
 import { StoragePage } from "./pages/StoragePage";
 import type {
   AccountQuotaSnapshot,
+  LanguageMode,
   NativePluginInfo,
   OverviewSnapshot,
   PluginPayload,
@@ -82,6 +88,7 @@ const THEME_MODES: ThemeMode[] = ["auto", "light", "dark"];
 const DEFAULT_SITE_URL = "https://www.haoanlab.xyz";
 
 export default function App() {
+  const { t, setLanguageMode, setSystemLang } = useI18n();
   const [view, setView] = useState<ViewState>({ kind: "tab", tab: "status" });
   const [nativeSubTab, setNativeSubTab] = useState<NativeSubTabId>("plugins");
   const [transitionDir, setTransitionDir] = useState<TransitionDir>("fade");
@@ -147,6 +154,7 @@ export default function App() {
   const dismissedVersionRef = useRef<string | null>(null);
   const remoteInstallInFlightRef = useRef(false);
   const themeInitializedRef = useRef(false);
+  const langInitializedRef = useRef(false);
   const seenIdsInFlightRef = useRef<Set<string>>(new Set());
   const selectedQuotaAccountKeyRef = useRef<string | null>(null);
 
@@ -169,6 +177,32 @@ export default function App() {
       root.classList.remove("dark");
     }
   }, [resolvedDark]);
+
+  // Sync Windows OS display language via Tauri command on startup
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    ipc
+      .getSystemLanguage()
+      .then((sysLang) => {
+        setSystemLang(normalizeLocaleTag(sysLang));
+      })
+      .catch(() => {});
+  }, [setSystemLang]);
+
+  const handleChangeLanguageMode = useCallback(
+    async (next: LanguageMode) => {
+      langInitializedRef.current = true;
+      setLanguageMode(next);
+      if (isTauriRuntime()) {
+        try {
+          await ipc.saveUiPreferences({ language: next });
+        } catch {
+          // non-fatal
+        }
+      }
+    },
+    [setLanguageMode],
+  );
 
   // Sync OS dark mode via matchMedia + Tauri winreg command
   useEffect(() => {
@@ -229,16 +263,16 @@ export default function App() {
         setRemoteMarketplace(res);
       } else {
         setRemoteMarketplace((previous) => previous?.status === "ok" ? previous : res);
-        if (force) pushToast(res.message || "暂无法连接远程插件市场", "warn");
+        if (force) pushToast(res.message || t("暂无法连接远程插件市场", "Unable to reach remote plugin marketplace"), "warn");
       }
     } catch (err) {
       if (force) {
-        pushToast(`远程市场刷新失败：${formatErrorMessage(err)}`, "warn");
+        pushToast(t(`远程市场刷新失败：${formatErrorMessage(err)}`, `Marketplace refresh failed: ${formatErrorMessage(err)}`), "warn");
       }
     } finally {
       setLoadingMarketplace(false);
     }
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   const refreshQuota = useCallback(
     async (notify = false) => {
@@ -249,25 +283,25 @@ export default function App() {
         setAccountQuota(snap);
         if (notify) {
           if (!snap.liveAccountKey) {
-            pushToast("Antigravity 未运行，已显示离线缓存", "info");
+            pushToast(t("Antigravity 未运行，已显示离线缓存", "Antigravity is not running; showing offline cache"), "info");
           } else if (
             selectedQuotaAccountKeyRef.current &&
             selectedQuotaAccountKeyRef.current !== snap.liveAccountKey
           ) {
-            pushToast("已同步当前登录账号，当前正在查看其他账号缓存", "info");
+            pushToast(t("已同步当前登录账号，当前正在查看其他账号缓存", "Synced active account; currently viewing another cached account"), "info");
           } else {
-            pushToast("账号额度已刷新", "ok");
+            pushToast(t("账号额度已刷新", "Account quota refreshed"), "ok");
           }
         }
       } catch (err) {
         if (notify) {
-          pushToast(`刷新额度失败：${formatErrorMessage(err)}`, "error");
+          pushToast(t(`刷新额度失败：${formatErrorMessage(err)}`, `Failed to refresh quota: ${formatErrorMessage(err)}`), "error");
         }
       } finally {
         setBusyQuotaRefresh(false);
       }
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   const handleSelectQuotaAccount = useCallback(
@@ -289,14 +323,14 @@ export default function App() {
         const snap = await ipc.removeCachedQuotaAccount(accountKey);
         setAccountQuota(snap);
         setSelectedQuotaAccountKey((prev) => (prev === accountKey ? null : prev));
-        pushToast("已移除该账号的额度缓存", "ok");
+        pushToast(t("已移除该账号的额度缓存", "Removed cached quota for this account"), "ok");
       } catch (err) {
-        pushToast(`移除缓存失败：${formatErrorMessage(err)}`, "error");
+        pushToast(t(`移除缓存失败：${formatErrorMessage(err)}`, `Failed to remove cache: ${formatErrorMessage(err)}`), "error");
       } finally {
         setRemovingQuotaAccountKey((prev) => (prev === accountKey ? null : prev));
       }
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   const refreshAll = useCallback(
@@ -318,18 +352,23 @@ export default function App() {
             setThemeMode(ov.ui.theme);
           }
         }
+        if (!langInitializedRef.current) {
+          langInitializedRef.current = true;
+          const savedLang = normalizeLanguageMode(ov.ui?.language);
+          setLanguageMode(savedLang ?? "auto");
+        }
         if (notify) {
-          pushToast("状态已更新", "ok");
+          pushToast(t("状态已更新", "Status refreshed"), "ok");
         }
       } catch (err) {
         if (notify) {
-          pushToast(`刷新失败：${formatErrorMessage(err)}`, "error");
+          pushToast(t(`刷新失败：${formatErrorMessage(err)}`, `Refresh failed: ${formatErrorMessage(err)}`), "error");
         }
       } finally {
         setBusyRefreshing(false);
       }
     },
-    [pushToast],
+    [pushToast, setLanguageMode, t],
   );
 
   // Initial load & Tauri event subscriptions
@@ -350,6 +389,11 @@ export default function App() {
         if (!themeInitializedRef.current && ov.ui?.theme && THEME_MODES.includes(ov.ui.theme)) {
           themeInitializedRef.current = true;
           setThemeMode(ov.ui.theme);
+        }
+        if (!langInitializedRef.current) {
+          langInitializedRef.current = true;
+          const savedLang = normalizeLanguageMode(ov.ui?.language);
+          setLanguageMode(savedLang ?? "auto");
         }
       })
       .then(register)
@@ -518,17 +562,20 @@ export default function App() {
   // Actions
   const handleQuickLaunch = async () => {
     setBusyLaunch(true);
-    pushToast("正在启动并挂载插件...", "info");
+    pushToast(t("正在启动并挂载插件...", "Launching Antigravity and attaching plugins..."), "info");
     try {
       const res = await ipc.launchAntigravityAndAttach(true);
       const errors = (res.results ?? []).filter((r) => r.status === "error");
       if (errors.length > 0) {
         pushToast(
-          `Antigravity 已启动（${errors[0].id}: ${errors[0].error || "启动失败"}）`,
+          t(
+            `Antigravity 已启动（${errors[0].id}: ${errors[0].error || "启动失败"}）`,
+            `Antigravity started (${errors[0].id}: ${errors[0].error || "failed to start"})`,
+          ),
           "warn",
         );
       } else {
-        pushToast("Antigravity 已就绪", "ok");
+        pushToast(t("Antigravity 已就绪", "Antigravity is ready"), "ok");
       }
       if (res.overview) {
         setOverview(res.overview);
@@ -536,7 +583,7 @@ export default function App() {
         await refreshAll(false);
       }
     } catch (err) {
-      pushToast(`启动失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`启动失败：${formatErrorMessage(err)}`, `Launch failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setBusyLaunch(false);
     }
@@ -544,56 +591,71 @@ export default function App() {
 
   const handleAttachEnabled = async () => {
     setBusyAttach(true);
-    pushToast("正在热附着插件...", "info");
+    pushToast(t("正在热附着插件...", "Hot-attaching enabled plugins..."), "info");
     try {
       const results = await ipc.attachEnabledPlugins("attach");
       const errors = (results ?? []).filter((r) => r.status === "error");
       if (errors.length > 0) {
-        pushToast(`热附着完成（部分失败：${errors[0].id}）`, "warn");
+        pushToast(
+          t(
+            `热附着完成（部分失败：${errors[0].id}）`,
+            `Hot attach completed (failed: ${errors[0].id})`,
+          ),
+          "warn",
+        );
       } else {
-        pushToast("热附着完成", "ok");
+        pushToast(t("热附着完成", "Hot attach completed"), "ok");
       }
       await refreshAll(false);
     } catch (err) {
-      pushToast(`热附着失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`热附着失败：${formatErrorMessage(err)}`, `Hot attach failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setBusyAttach(false);
     }
   };
 
   const handleStopAllPlugins = async () => {
-    pushToast("正在停止全部插件...", "info");
+    pushToast(t("正在停止全部插件...", "Stopping all plugins..."), "info");
     try {
       await ipc.stopAllPlugins();
-      pushToast("已停止全部插件", "ok");
+      pushToast(t("已停止全部插件", "Stopped all plugins"), "ok");
       await refreshAll(false);
     } catch (err) {
-      pushToast(`停止失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`停止失败：${formatErrorMessage(err)}`, `Stop failed: ${formatErrorMessage(err)}`), "error");
     }
   };
 
   const handleCleanupResiduals = async () => {
-    pushToast("正在检查并清理残留进程...", "info");
+    pushToast(t("正在检查并清理残留进程...", "Checking and cleaning residual processes..."), "info");
     try {
       const res = await ipc.cleanupAntigravityResiduals();
       if (res.skipped) {
-        pushToast(res.reason || "Antigravity 主窗口仍在运行，已跳过", "warn");
+        pushToast(
+          res.reason || t("Antigravity 主窗口仍在运行，已跳过", "Antigravity main window is still running; skipped"),
+          "warn",
+        );
       } else {
         const count = res.killedPids?.length ?? 0;
-        pushToast(`已清理 ${count} 个残留进程并停止全部插件`, "ok");
+        pushToast(
+          t(
+            `已清理 ${count} 个残留进程并停止全部插件`,
+            `Cleaned ${count} residual process(es) and stopped all plugins`,
+          ),
+          "ok",
+        );
       }
       await refreshAll(false);
     } catch (err) {
-      pushToast(`清理失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`清理失败：${formatErrorMessage(err)}`, `Cleanup failed: ${formatErrorMessage(err)}`), "error");
     }
   };
 
   const handleCreateShortcuts = async () => {
     try {
       await ipc.createAllShortcuts();
-      pushToast("桌面图标已更新", "ok");
+      pushToast(t("桌面图标已更新", "Desktop shortcuts updated"), "ok");
     } catch (err) {
-      pushToast(`生成失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`生成失败：${formatErrorMessage(err)}`, `Failed to create shortcuts: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -601,10 +663,16 @@ export default function App() {
     setBusyPluginId(pluginId);
     try {
       await ipc.togglePlugin(pluginId, enabled);
-      pushToast(`${pluginId} 已${enabled ? "启用" : "禁用"}`, "ok");
+      pushToast(
+        t(
+          `${pluginId} 已${enabled ? "启用" : "禁用"}`,
+          `${pluginId} ${enabled ? "enabled" : "disabled"}`,
+        ),
+        "ok",
+      );
       await refreshAll(false);
     } catch (err) {
-      pushToast(`切换失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`切换失败：${formatErrorMessage(err)}`, `Toggle failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setBusyPluginId(null);
     }
@@ -612,7 +680,11 @@ export default function App() {
 
   const handlePluginAction = async (pluginId: string, action: "start" | "stop" | "restart") => {
     setBusyPluginId(pluginId);
-    const labelMap = { start: "已启动", stop: "已停止", restart: "已重启" };
+    const labelMap = {
+      start: t("已启动", "started"),
+      stop: t("已停止", "stopped"),
+      restart: t("已重启", "restarted"),
+    };
     try {
       if (action === "start") {
         await ipc.startPlugin(pluginId, "attach");
@@ -624,7 +696,7 @@ export default function App() {
       pushToast(`${pluginId} ${labelMap[action]}`, "ok");
       await refreshAll(false);
     } catch (err) {
-      pushToast(`操作失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`操作失败：${formatErrorMessage(err)}`, `Action failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setBusyPluginId(null);
     }
@@ -635,12 +707,15 @@ export default function App() {
     try {
       await ipc.savePluginEntry(mode, payload);
       setEditorState({ open: false, initial: null, saving: false });
-      pushToast(mode === "edit" ? "配置已更新" : "已保存新插件", "ok");
+      pushToast(
+        mode === "edit" ? t("配置已更新", "Configuration updated") : t("已保存新插件", "Plugin saved"),
+        "ok",
+      );
       await refreshAll(false);
       await refreshRemoteMarketplace(false);
     } catch (err) {
       setEditorState((prev) => ({ ...prev, saving: false }));
-      pushToast(`保存失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`保存失败：${formatErrorMessage(err)}`, `Save failed: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -652,11 +727,20 @@ export default function App() {
       const res = await ipc.deletePluginEntry(pluginId, deleteFiles);
       setDeleteTarget(null);
       if (deleteFiles && res.fileDeleteError) {
-        pushToast(`已移除 ${pluginId} 配置，但目录删除失败：${res.fileDeleteError}`, "warn");
+        pushToast(
+          t(
+            `已移除 ${pluginId} 配置，但目录删除失败：${res.fileDeleteError}`,
+            `Removed ${pluginId} config, but failed to delete folder: ${res.fileDeleteError}`,
+          ),
+          "warn",
+        );
       } else if (res.filesDeleted) {
-        pushToast(`已移除 ${pluginId} 并删除本地目录`, "ok");
+        pushToast(
+          t(`已移除 ${pluginId} 并删除本地目录`, `Removed ${pluginId} and deleted local folder`),
+          "ok",
+        );
       } else {
-        pushToast(`已移除 ${pluginId}`, "ok");
+        pushToast(t(`已移除 ${pluginId}`, `Removed ${pluginId}`), "ok");
       }
       if (returnToList) {
         backToExternalList();
@@ -665,7 +749,7 @@ export default function App() {
       await refreshRemoteMarketplace(false);
     } catch (err) {
       setDeleteTarget(null);
-      pushToast(`移除失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`移除失败：${formatErrorMessage(err)}`, `Remove failed: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -682,7 +766,10 @@ export default function App() {
 
   const performLocalPackageInstall = useCallback(
     async (packagePath: string, allowLowRisk: boolean) => {
-      pushToast(`正在安装插件包 ${basename(packagePath)}...`, "info");
+      pushToast(
+        t(`正在安装插件包 ${basename(packagePath)}...`, `Installing package ${basename(packagePath)}...`),
+        "info",
+      );
       const res = await ipc.installPluginPackage(packagePath, true, allowLowRisk);
       const plugin = res.plugin;
       const label = plugin?.name || plugin?.id || basename(packagePath);
@@ -699,16 +786,22 @@ export default function App() {
       }
 
       if (activated) {
-        pushToast(`已安装并激活插件: ${label}`, "ok");
+        pushToast(t(`已安装并激活插件: ${label}`, `Installed and started plugin: ${label}`), "ok");
       } else if (attachErr) {
-        pushToast(`已安装插件: ${label}（自动激活失败: ${attachErr}）`, "warn");
+        pushToast(
+          t(
+            `已安装插件: ${label}（自动激活失败: ${attachErr}）`,
+            `Installed plugin: ${label} (auto-start failed: ${attachErr})`,
+          ),
+          "warn",
+        );
       } else {
-        pushToast(`已安装插件: ${label}`, "ok");
+        pushToast(t(`已安装插件: ${label}`, `Installed plugin: ${label}`), "ok");
       }
       await refreshAll(false);
       await refreshRemoteMarketplace(false);
     },
-    [pushToast, refreshAll, refreshRemoteMarketplace, shouldAutoActivateInstalledPlugin],
+    [pushToast, refreshAll, refreshRemoteMarketplace, shouldAutoActivateInstalledPlugin, t],
   );
 
   const installPackagePath = useCallback(
@@ -731,7 +824,7 @@ export default function App() {
                     setScanModalState({ open: false, pluginLabel: "", report: null, busy: false });
                   } catch (err) {
                     setScanModalState((prev) => ({ ...prev, busy: false }));
-                    pushToast(`安装失败：${formatErrorMessage(err)}`, "error");
+                    pushToast(t(`安装失败：${formatErrorMessage(err)}`, `Install failed: ${formatErrorMessage(err)}`), "error");
                   }
                 },
           });
@@ -739,10 +832,10 @@ export default function App() {
         }
         await performLocalPackageInstall(packagePath, false);
       } catch (err) {
-        pushToast(`安装失败：${formatErrorMessage(err)}`, "error");
+        pushToast(t(`安装失败：${formatErrorMessage(err)}`, `Install failed: ${formatErrorMessage(err)}`), "error");
       }
     },
-    [performLocalPackageInstall, pushToast],
+    [performLocalPackageInstall, pushToast, t],
   );
 
   const performRemotePluginInstall = useCallback(
@@ -757,7 +850,7 @@ export default function App() {
           : pkg.tier === "third-party"
             ? `third-party:${pkg.sourceRepo.toLowerCase()}`
             : "official";
-      pushToast(`正在下载并安装 ${label}...`, "info");
+      pushToast(t(`正在下载并安装 ${label}...`, `Downloading and installing ${label}...`), "info");
       try {
         const res = await ipc.installRemotePlugin(
           pkg.id,
@@ -783,21 +876,32 @@ export default function App() {
         }
 
         if (activated) {
-          pushToast(`已安装并激活插件: ${label}`, "ok");
+          pushToast(t(`已安装并激活插件: ${label}`, `Installed and started plugin: ${label}`), "ok");
         } else if (attachErr) {
-          pushToast(`已安装插件: ${label}（自动激活失败: ${attachErr}）`, "warn");
+          pushToast(
+            t(
+              `已安装插件: ${label}（自动激活失败: ${attachErr}）`,
+              `Installed plugin: ${label} (auto-start failed: ${attachErr})`,
+            ),
+            "warn",
+          );
         } else {
-          pushToast(`已${pkg.hasUpdate ? "更新" : "安装"}插件: ${label}`, "ok");
+          pushToast(
+            pkg.hasUpdate
+              ? t(`已更新插件: ${label}`, `Updated plugin: ${label}`)
+              : t(`已安装插件: ${label}`, `Installed plugin: ${label}`),
+            "ok",
+          );
         }
         await Promise.all([refreshAll(false), refreshRemoteMarketplace(false)]);
       } catch (err) {
-        pushToast(`远程安装失败：${formatErrorMessage(err)}`, "error");
+        pushToast(t(`远程安装失败：${formatErrorMessage(err)}`, `Remote install failed: ${formatErrorMessage(err)}`), "error");
       } finally {
         remoteInstallInFlightRef.current = false;
         setInstallingRemoteId(null);
       }
     },
-    [pushToast, refreshAll, refreshRemoteMarketplace, shouldAutoActivateInstalledPlugin],
+    [pushToast, refreshAll, refreshRemoteMarketplace, shouldAutoActivateInstalledPlugin, t],
   );
 
   const handleInstallRemotePlugin = useCallback(
@@ -807,7 +911,10 @@ export default function App() {
         const report: SecurityScanReport = {
           riskLevel: "high",
           blocked: false,
-          summary: "该官方插件包含需额外权限或二进制的能力，已通过仓库维护者人工复核放行；请确认后再安装。",
+          summary: t(
+            "该官方插件包含需额外权限或二进制的能力，已通过仓库维护者人工复核放行；请确认后再安装。",
+            "This official plugin uses extra permissions or binary capabilities and was manually reviewed and approved by the maintainers. Please confirm before installing.",
+          ),
           externalDomains: pkg.riskFindings.flatMap((f) => f.targets ?? []),
           findings: pkg.riskFindings,
           scannedFiles: 0,
@@ -831,7 +938,10 @@ export default function App() {
         const report: SecurityScanReport = {
           riskLevel: "low",
           blocked: false,
-          summary: `第三方插件在自动筛查中发现 ${pkg.riskFindings.length} 项敏感行为提醒`,
+          summary: t(
+            `第三方插件在自动筛查中发现 ${pkg.riskFindings.length} 项敏感行为提醒`,
+            `Automated scan found ${pkg.riskFindings.length} sensitive behavior notice(s) in this third-party plugin`,
+          ),
           externalDomains: pkg.riskFindings.flatMap((f) => f.targets ?? []),
           findings: pkg.riskFindings,
           scannedFiles: 0,
@@ -852,7 +962,7 @@ export default function App() {
       }
       await performRemotePluginInstall(pkg, true);
     },
-    [performRemotePluginInstall],
+    [performRemotePluginInstall, t],
   );
 
   const handleUpdateAllRemotePlugins = useCallback(async () => {
@@ -862,7 +972,10 @@ export default function App() {
     if (updates.length === 0 || remoteInstallInFlightRef.current) return;
     remoteInstallInFlightRef.current = true;
     setUpdatingAllRemote(true);
-    pushToast(`正在一键更新 ${updates.length} 个插件...`, "info");
+    pushToast(
+      t(`正在一键更新 ${updates.length} 个插件...`, `Updating ${updates.length} plugin(s)...`),
+      "info",
+    );
 
     let okCount = 0;
     let failCount = 0;
@@ -900,28 +1013,34 @@ export default function App() {
 
     await Promise.all([refreshAll(false), refreshRemoteMarketplace(false)]);
     if (failCount === 0) {
-      pushToast(`已全部更新 ${okCount} 个插件`, "ok");
+      pushToast(t(`已全部更新 ${okCount} 个插件`, `Updated all ${okCount} plugin(s)`), "ok");
     } else {
-      pushToast(`更新完成：成功 ${okCount} 个，失败 ${failCount} 个`, "warn");
+      pushToast(
+        t(
+          `更新完成：成功 ${okCount} 个，失败 ${failCount} 个`,
+          `Update finished: ${okCount} succeeded, ${failCount} failed`,
+        ),
+        "warn",
+      );
     }
-  }, [pushToast, refreshAll, refreshRemoteMarketplace, remoteMarketplace, shouldAutoActivateInstalledPlugin]);
+  }, [pushToast, refreshAll, refreshRemoteMarketplace, remoteMarketplace, shouldAutoActivateInstalledPlugin, t]);
 
   const handleAddCustomRepo = useCallback(
     async (repoInput: string, label?: string) => {
       await ipc.addCustomMarketplaceRepo(repoInput, label);
-      pushToast(`已添加私人仓库：${repoInput}`, "ok");
+      pushToast(t(`已添加私人仓库：${repoInput}`, `Added private repository: ${repoInput}`), "ok");
       await refreshRemoteMarketplace(true);
     },
-    [pushToast, refreshRemoteMarketplace],
+    [pushToast, refreshRemoteMarketplace, t],
   );
 
   const handleRemoveCustomRepo = useCallback(
     async (repo: string) => {
       await ipc.removeCustomMarketplaceRepo(repo);
-      pushToast(`已移除私人仓库：${repo}`, "info");
+      pushToast(t(`已移除私人仓库：${repo}`, `Removed private repository: ${repo}`), "info");
       await refreshRemoteMarketplace(true);
     },
-    [pushToast, refreshRemoteMarketplace],
+    [pushToast, refreshRemoteMarketplace, t],
   );
 
   const handleToggleCustomRepo = useCallback(
@@ -942,17 +1061,17 @@ export default function App() {
   const handlePickPackageFile = async () => {
     try {
       const filePath = await ipc.pickFile({
-        title: "选择插件安装包",
+        title: t("选择插件安装包", "Select Plugin Package"),
         defaultPath: overview?.dataDir || undefined,
         filters: [
-          { name: "插件安装包", extensions: ["zip", "agypkg", "agy-plugin"] },
+          { name: t("插件安装包", "Plugin Packages"), extensions: ["zip", "agypkg", "agy-plugin"] },
         ],
       });
       if (filePath) {
         await installPackagePath(filePath);
       }
     } catch (err) {
-      pushToast(`选择文件失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`选择文件失败：${formatErrorMessage(err)}`, `Failed to pick file: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -977,7 +1096,13 @@ export default function App() {
               installPackagePath(p);
             }
           } else if (payload.paths?.length) {
-            pushToast("仅支持 .zip / .agypkg / .agy-plugin 格式的插件包", "warn");
+            pushToast(
+              t(
+                "仅支持 .zip / .agypkg / .agy-plugin 格式的插件包",
+                "Only .zip / .agypkg / .agy-plugin packages are supported",
+              ),
+              "warn",
+            );
           }
         }
       })
@@ -989,7 +1114,7 @@ export default function App() {
     return () => {
       unlisten?.();
     };
-  }, [installPackagePath, pushToast]);
+  }, [installPackagePath, pushToast, t]);
 
   // Update checker
   const handleCheckUpdates = async () => {
@@ -1002,15 +1127,15 @@ export default function App() {
         setUpdateBannerVisible(true);
       } else if (res.status === "ok") {
         setUpdateBannerVisible(false);
-        pushToast(res.message || "当前已是最新版本", "ok");
+        pushToast(res.message || t("当前已是最新版本", "You are on the latest version"), "ok");
       } else if (res.status === "unpublished") {
         setUpdateBannerVisible(false);
-        pushToast(res.message || "官网暂未发布新版本", "info");
+        pushToast(res.message || t("官网暂未发布新版本", "No release published on website yet"), "info");
       } else {
-        pushToast(res.message || "暂无法连接更新服务", "warn");
+        pushToast(res.message || t("暂无法连接更新服务", "Unable to reach update service"), "warn");
       }
     } catch (err) {
-      pushToast(`检查更新失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`检查更新失败：${formatErrorMessage(err)}`, `Update check failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setCheckingUpdate(false);
     }
@@ -1021,7 +1146,7 @@ export default function App() {
     try {
       await ipc.openExternalUrl(url);
     } catch (err) {
-      pushToast(`打开官网失败：${formatErrorMessage(err)}`, "error");
+      pushToast(t(`打开官网失败：${formatErrorMessage(err)}`, `Failed to open website: ${formatErrorMessage(err)}`), "error");
     }
   };
 
@@ -1195,6 +1320,7 @@ export default function App() {
                 overview={overview}
                 updateResult={updateResult}
                 checkingUpdate={checkingUpdate}
+                onChangeLanguage={handleChangeLanguageMode}
                 onRefresh={() => refreshAll(true)}
                 onAttachEnabled={handleAttachEnabled}
                 onStopAllPlugins={handleStopAllPlugins}
@@ -1236,9 +1362,11 @@ export default function App() {
                 />
               ) : (
                 <div className="agy-card flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                  <p className="text-[13.5px] text-[var(--text-muted)]">未找到该插件配置</p>
+                  <p className="text-[13.5px] text-[var(--text-muted)]">
+                    {t("未找到该插件配置", "Plugin configuration not found")}
+                  </p>
                   <button type="button" onClick={backToExternalList} className="agy-btn">
-                    返回我的插件
+                    {t("返回我的插件", "Back to Plugins")}
                   </button>
                 </div>
               ))}
@@ -1255,9 +1383,11 @@ export default function App() {
                 />
               ) : (
                 <div className="agy-card flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                  <p className="text-[13.5px] text-[var(--text-muted)]">未找到该原生扩展</p>
+                  <p className="text-[13.5px] text-[var(--text-muted)]">
+                    {t("未找到该原生扩展", "Native extension not found")}
+                  </p>
                   <button type="button" onClick={backToNativeList} className="agy-btn">
-                    返回原生管理
+                    {t("返回原生管理", "Back to Native")}
                   </button>
                 </div>
               ))}
@@ -1276,20 +1406,29 @@ export default function App() {
 
       <ConfirmModal
         open={Boolean(deleteTarget)}
-        title="确认移除插件"
+        title={t("确认移除插件", "Remove Plugin")}
         description={
           deleteTarget
-            ? `确定移除「${deleteTarget.pluginId}」并停止其关联的外部插件进程吗？`
+            ? t(
+                `确定移除「${deleteTarget.pluginId}」并停止其关联的外部插件进程吗？`,
+                `Remove "${deleteTarget.pluginId}" and stop its associated external plugin process?`,
+              )
             : ""
         }
-        confirmLabel="确认移除"
+        confirmLabel={t("确认移除", "Remove")}
         busy={deleteTarget?.busy ?? false}
         checkboxLabel={
           deleteTarget
-            ? `同时删除本地插件目录文件 (plugins/${deleteTarget.pluginId})`
+            ? t(
+                `同时删除本地插件目录文件 (plugins/${deleteTarget.pluginId})`,
+                `Also delete local plugin folder (plugins/${deleteTarget.pluginId})`,
+              )
             : undefined
         }
-        checkboxHint="勾选后将永久删除该插件在本地 plugins 目录下的所有文件"
+        checkboxHint={t(
+          "勾选后将永久删除该插件在本地 plugins 目录下的所有文件",
+          "Permanently deletes all files in this plugin's local plugins directory",
+        )}
         checkboxChecked={deleteTarget?.deleteFiles ?? false}
         onCheckboxChange={(checked) =>
           setDeleteTarget((prev) => (prev ? { ...prev, deleteFiles: checked } : null))

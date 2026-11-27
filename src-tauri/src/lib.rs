@@ -5,6 +5,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod detector;
+pub mod i18n;
 pub mod marketplace;
 pub mod models;
 pub mod paths;
@@ -135,16 +136,30 @@ fn spawn_background_monitor(app: tauri::AppHandle, paths: ManagerPaths) {
                                     if !cleanup.skipped
                                         && (!cleanup.killed_pids.is_empty() || stopped_plugins > 0)
                                     {
-                                        let msg = match (cleanup.killed_pids.len(), stopped_plugins) {
-                                            (k, s) if k > 0 && s > 0 => format!(
-                                                "Antigravity 已退出，已清理 {k} 个残留进程并停止 {s} 个插件"
-                                            ),
-                                            (k, _) if k > 0 => format!(
-                                                "Antigravity 已退出，已清理 {k} 个残留进程"
-                                            ),
-                                            (_, s) => format!(
-                                                "Antigravity 已退出，已停止 {s} 个托管插件"
-                                            ),
+                                        let msg = if i18n::is_en() {
+                                            match (cleanup.killed_pids.len(), stopped_plugins) {
+                                                (k, s) if k > 0 && s > 0 => format!(
+                                                    "Antigravity exited: cleaned {k} residual process(es) and stopped {s} plugin(s)"
+                                                ),
+                                                (k, _) if k > 0 => format!(
+                                                    "Antigravity exited: cleaned {k} residual process(es)"
+                                                ),
+                                                (_, s) => format!(
+                                                    "Antigravity exited: stopped {s} managed plugin(s)"
+                                                ),
+                                            }
+                                        } else {
+                                            match (cleanup.killed_pids.len(), stopped_plugins) {
+                                                (k, s) if k > 0 && s > 0 => format!(
+                                                    "Antigravity 已退出，已清理 {k} 个残留进程并停止 {s} 个插件"
+                                                ),
+                                                (k, _) if k > 0 => format!(
+                                                    "Antigravity 已退出，已清理 {k} 个残留进程"
+                                                ),
+                                                (_, s) => format!(
+                                                    "Antigravity 已退出，已停止 {s} 个托管插件"
+                                                ),
+                                            }
                                         };
                                         let _ = app_c.emit(
                                             events::TOAST_MESSAGE,
@@ -224,6 +239,7 @@ pub fn run() {
             let resource_dir = app.path().resource_dir().ok();
             let paths = ManagerPaths::resolve(resource_dir.as_deref());
             let initial_cfg = config::load_config(&paths).unwrap_or_default();
+            i18n::apply_language_pref(initial_cfg.ui.language.as_deref());
 
             app.manage(AppState {
                 paths: paths.clone(),
@@ -311,6 +327,7 @@ pub fn run() {
             commands::pick_storage_project,
             commands::remove_storage_project,
             commands::get_system_dark_mode,
+            commands::get_system_language,
             commands::scan_agy_storage,
             commands::get_storage_tree,
             commands::clean_orphan_storage_summaries,

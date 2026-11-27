@@ -132,9 +132,16 @@ fn quoted_cred_basename_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
         Regex::new(
-            r#"(?i)(?:'login data'|"login data"|`login data`|'local state'|"local state"|`local state`|'web data'|"web data"|`web data`)"#,
+            r#"(?i)(?:'(?:login data|local state|web data)(?:-(?:journal|wal|shm))?'|"(?:login data|local state|web data)(?:-(?:journal|wal|shm))?"|`(?:login data|local state|web data)(?:-(?:journal|wal|shm))?`)"#,
         )
         .unwrap()
+    })
+}
+
+fn pure_list_entry_line_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r#"^\s*(?:(?:['"`][^'"`\r\n]*['"`]|/[^/\r\n]+/[gimsuy]*)\s*,?\s*)+$"#).unwrap()
     })
 }
 
@@ -285,11 +292,29 @@ pub fn has_credential_theft_risk(code_text: &str) -> bool {
         if browser_cred_file_re().is_match(&without_benign_quoted) {
             return true;
         }
-        let start = idx.saturating_sub(12);
-        let end = (idx + 2).min(lines.len().saturating_sub(1));
-        let has_defensive_context = lines[start..=end]
-            .iter()
-            .any(|l| defensive_denylist_re().is_match(l));
+        let mut has_defensive_context = defensive_denylist_re().is_match(line);
+        if !has_defensive_context && idx + 1 < lines.len() {
+            let end = (idx + 2).min(lines.len() - 1);
+            has_defensive_context = lines[idx + 1..=end]
+                .iter()
+                .any(|l| defensive_denylist_re().is_match(l));
+        }
+        if !has_defensive_context && idx > 0 {
+            let short_start = idx.saturating_sub(12);
+            let long_start = idx.saturating_sub(120);
+            for j in (long_start..idx).rev() {
+                if defensive_denylist_re().is_match(lines[j]) {
+                    has_defensive_context = true;
+                    break;
+                }
+                if j < short_start
+                    && !lines[j].trim().is_empty()
+                    && !pure_list_entry_line_re().is_match(lines[j])
+                {
+                    break;
+                }
+            }
+        }
         if !has_defensive_context {
             return true;
         }
@@ -445,6 +470,7 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
 
     // 1. Check archive paths & manifest first
     let mut manifest_json: Option<Value> = None;
+    let mut manifest_depth: usize = usize::MAX;
     for idx in 0..archive.len() {
         let mut entry = archive
             .by_index(idx)
@@ -452,7 +478,26 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
         if entry.is_dir() {
             continue;
         }
-        let rel = strip_manifest_prefix(entry.name());
+        let raw_posix = entry.name().replace('\\', "/");
+        let has_drive_prefix = raw_posix.as_bytes().len() >= 2
+            && raw_posix.as_bytes()[0].is_ascii_alphabetic()
+            && raw_posix.as_bytes()[1] == b':';
+        let has_parent_dir = raw_posix.split('/').any(|seg| seg == "..");
+        if raw_posix.starts_with('/') || has_drive_prefix || has_parent_dir {
+            add_finding(
+                &mut findings,
+                SecurityFinding {
+                    severity: "high".to_string(),
+                    code: "UNSAFE_ARCHIVE_PATH".to_string(),
+                    title: "压缩包包含不安全的路径穿越条目".to_string(),
+                    detail: "压缩包内存在越权释放路径，存在覆盖其他目录文件的风险".to_string(),
+                    file: raw_posix.clone(),
+                    targets: vec![raw_posix],
+                },
+            );
+            continue;
+        }
+        let rel = strip_manifest_prefix(&raw_posix);
         let rel_lower = rel.to_ascii_lowercase();
         let ext = file_extension(&rel_lower);
 
@@ -466,21 +511,24 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
                     title: "禁止包含可执行程序或系统脚本".to_string(),
                     detail: format!("压缩包内包含 .{ext} 文件，安全策略禁止黑盒可执行程序上架或安装"),
                     file: rel.clone(),
-                    targets: vec![rel.clone()],
+                    targets: [rel].to_vec(),
                 },
             );
             continue;
         }
 
-        // Read bounded bytes
+        // Read bounded bytes (and detect oversized payloads even if header size is spoofed)
         let mut buf = Vec::new();
-        let size_hint = entry.size() as usize;
-        if size_hint <= MAX_SCAN_FILE_BYTES {
-            let _ = entry.read_to_end(&mut buf);
+        let mut oversized = entry.size() > MAX_SCAN_FILE_BYTES as u64;
+        if !oversized {
+            let mut limited = (&mut entry).take((MAX_SCAN_FILE_BYTES + 1) as u64);
+            let _ = limited.read_to_end(&mut buf);
+            if buf.len() > MAX_SCAN_FILE_BYTES {
+                oversized = true;
+                buf.truncate(64);
+            }
         } else {
-            let mut prefix = vec![0u8; 64];
-            let n = entry.read(&mut prefix).unwrap_or(0);
-            buf.extend_from_slice(&prefix[..n]);
+            let _ = (&mut entry).take(64).read_to_end(&mut buf);
         }
 
         // PE MZ header check for non-asset files
@@ -499,16 +547,43 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
             continue;
         }
 
-        if rel_lower == "agy-plugin.json" || rel_lower.ends_with("/agy-plugin.json") {
-            if let Ok(text) = std::str::from_utf8(&buf) {
-                if let Ok(val) = serde_json::from_str::<Value>(strip_utf8_bom(text)) {
-                    manifest_json = Some(val);
+        let m_depth: Option<usize> = if rel_lower == "agy-plugin.json" {
+            Some(0)
+        } else if rel_lower.ends_with("/agy-plugin.json") && rel_lower.matches('/').count() == 1 {
+            Some(1)
+        } else {
+            None
+        };
+        if let Some(depth) = m_depth {
+            if depth < manifest_depth && !oversized {
+                if let Ok(text) = std::str::from_utf8(&buf) {
+                    if let Ok(val) = serde_json::from_str::<Value>(strip_utf8_bom(text)) {
+                        manifest_json = Some(val);
+                        manifest_depth = depth;
+                    }
                 }
             }
             continue;
         }
 
         if !CODE_FILE_EXTS.contains(&ext) {
+            continue;
+        }
+        let is_vendored = is_vendored_minified_asset(&rel_lower);
+        if oversized {
+            if !is_vendored {
+                add_finding(
+                    &mut findings,
+                    SecurityFinding {
+                        severity: "high".to_string(),
+                        code: "OVERSIZED_CODE_FILE".to_string(),
+                        title: "单个代码文件超过安全扫描上限".to_string(),
+                        detail: "代码文件体积超过 4 MB，无法自动完整审查，已拦截".to_string(),
+                        file: rel.clone(),
+                        targets: vec![rel.clone()],
+                    },
+                );
+            }
             continue;
         }
         scanned_files += 1;
@@ -518,7 +593,6 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
         };
         let code_text = strip_comments(text, ext);
         let code_str = code_text.as_str();
-        let is_vendored = is_vendored_minified_asset(&rel_lower);
 
         // High-risk checks (skip vendored minified browser libs like pdf.min.mjs on heuristic obfuscation)
         if !is_vendored {
@@ -720,14 +794,28 @@ pub fn scan_zip_bytes(bytes: &[u8]) -> Result<SecurityScanReport, String> {
         "none"
     };
 
+    let tr = crate::i18n::tr;
+    let en = crate::i18n::is_en();
     let summary = if has_high {
         let high_count = findings.iter().filter(|f| f.severity == "high").count();
-        format!("筛查未通过：发现 {high_count} 项高危风险行为，已自动拦截")
+        if en {
+            format!("Security check failed: {high_count} high-risk issue(s) found and blocked")
+        } else {
+            format!("筛查未通过：发现 {high_count} 项高危风险行为，已自动拦截")
+        }
     } else if has_low {
         let low_count = findings.iter().filter(|f| f.severity == "low").count();
-        format!("发现 {low_count} 项敏感行为提醒，请确认符合插件用途后再决定")
+        if en {
+            format!("{low_count} sensitive behavior notice(s) found. Please review before installing.")
+        } else {
+            format!("发现 {low_count} 项敏感行为提醒，请确认符合插件用途后再决定")
+        }
     } else {
-        "代码筛查通过，未发现敏感或高危行为".to_string()
+        tr(
+            "代码筛查通过，未发现敏感或高危行为",
+            "Security scan passed with no sensitive or high-risk behaviors found",
+        )
+        .to_string()
     };
 
     Ok(SecurityScanReport {
@@ -929,5 +1017,95 @@ mod tests {
             .findings
             .iter()
             .any(|f| f.code == "CREDENTIAL_OR_PERSISTENCE"));
+    }
+
+    #[test]
+    fn handles_long_denylist_and_journal_suffixes_accurately() {
+        let mut long_denylist = String::from("const SENSITIVE_BASENAMES = new Set([\n");
+        for i in 0..22 {
+            long_denylist.push_str(&format!("  'item-{i}.json',\n"));
+        }
+        long_denylist.push_str("  'login data',\n  'login data-journal',\n  'login data-wal',\n  'local state',\n  'web data',\n]);\n");
+        assert!(!has_credential_theft_risk(&long_denylist));
+
+        let mut non_list_gap = String::from("const sensitive = true;\n");
+        for _ in 0..15 {
+            non_list_gap.push_str("const a = 1;\n");
+        }
+        non_list_gap.push_str("const f = 'login data';\n");
+        assert!(has_credential_theft_risk(&non_list_gap));
+        assert!(has_credential_theft_risk(
+            "fs.readFileSync(path.join(dir, 'Login Data-journal'));"
+        ));
+    }
+
+    #[test]
+    fn catches_oversized_pe_oversized_code_zip_slip_and_nested_manifest_spoof() {
+        let mut pe_payload = Vec::with_capacity(5 * 1024 * 1024 + 4);
+        pe_payload.extend_from_slice(b"MZ\x90\x00");
+        pe_payload.resize(5 * 1024 * 1024 + 4, 0x41);
+        let oversized_pe_zip = make_test_zip(&[
+            (
+                "agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","command":"node","launchArgs":[]}"#,
+            ),
+            ("payload.dat", &pe_payload),
+        ]);
+        let r_pe = scan_zip_bytes(&oversized_pe_zip).unwrap();
+        assert!(r_pe.blocked);
+        assert!(r_pe.findings.iter().any(|f| f.code == "BANNED_PE_BINARY"));
+
+        let mut huge_js = b"console.log(\"ok\");\n".to_vec();
+        huge_js.resize(5 * 1024 * 1024, b'a');
+        let oversized_code_zip = make_test_zip(&[
+            (
+                "agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","command":"node","launchArgs":[]}"#,
+            ),
+            ("huge.js", &huge_js),
+        ]);
+        let r_code = scan_zip_bytes(&oversized_code_zip).unwrap();
+        assert!(r_code.blocked);
+        assert!(r_code
+            .findings
+            .iter()
+            .any(|f| f.code == "OVERSIZED_CODE_FILE"));
+
+        let vendored_zip = make_test_zip(&[
+            (
+                "agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","command":"node","launchArgs":[]}"#,
+            ),
+            ("lib/pdf.min.mjs", &huge_js),
+        ]);
+        let r_vendored = scan_zip_bytes(&vendored_zip).unwrap();
+        assert!(!r_vendored.blocked);
+
+        let slip_zip = make_test_zip(&[
+            (
+                "agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","command":"node","launchArgs":[]}"#,
+            ),
+            ("../escape.js", b"console.log(1);"),
+        ]);
+        let r_slip = scan_zip_bytes(&slip_zip).unwrap();
+        assert!(r_slip.blocked);
+        assert!(r_slip
+            .findings
+            .iter()
+            .any(|f| f.code == "UNSAFE_ARCHIVE_PATH"));
+
+        let nested_spoof_zip = make_test_zip(&[
+            (
+                "agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","command":"node","launchArgs":[]}"#,
+            ),
+            (
+                "fixtures/agy-plugin.json",
+                br#"{"schemaVersion":1,"id":"alice.tool","type":"exe-cdp","command":"evil.exe"}"#,
+            ),
+        ]);
+        let r_nested = scan_zip_bytes(&nested_spoof_zip).unwrap();
+        assert!(!r_nested.blocked);
     }
 }

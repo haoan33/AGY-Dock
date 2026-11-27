@@ -3,6 +3,7 @@ import { ArrowDown, Pause, Play, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { MOTION_EASE, SearchInput } from "../components/MotionPrimitives";
 import { formatBytes, formatErrorMessage } from "../lib/format";
+import { useI18n } from "../lib/i18n";
 import { events, ipc } from "../lib/ipc";
 import type { PluginRuntimeStatus } from "../types/ipc";
 
@@ -19,25 +20,29 @@ export function LogsPage({
   onSelectLogId,
   onToast,
 }: LogsPageProps) {
+  const { t } = useI18n();
   const [tailLines, setTailLines] = useState<number>(200);
   const [streaming, setStreaming] = useState<boolean>(true);
   const [filterQuery, setFilterQuery] = useState<string>("");
   const [logPath, setLogPath] = useState<string>("logs/launcher.log");
   const [logBytes, setLogBytes] = useState<number>(0);
-  const [content, setContent] = useState<string>("暂无日志");
+  const [rawContent, setRawContent] = useState<string>("");
+  const [readError, setReadError] = useState<string>("");
   const [clearing, setClearing] = useState<boolean>(false);
   const [pinnedBottom, setPinnedBottom] = useState<boolean>(true);
 
   const preRef = useRef<HTMLPreElement | null>(null);
 
   const displayContent = useMemo(() => {
+    if (readError) return t(`读取失败: ${readError}`, `Failed to read log: ${readError}`);
+    if (!rawContent) return t("暂无日志", "No logs yet");
     const q = filterQuery.trim().toLowerCase();
-    if (!q || content === "暂无日志") return content;
-    const matched = content
+    if (!q) return rawContent;
+    const matched = rawContent
       .split(/\r?\n/)
       .filter((line) => line.toLowerCase().includes(q));
-    return matched.length > 0 ? matched.join("\n") : "未找到匹配的日志行";
-  }, [content, filterQuery]);
+    return matched.length > 0 ? matched.join("\n") : t("未找到匹配的日志行", "No matching log lines");
+  }, [rawContent, readError, filterQuery, t]);
 
   const sources = useMemo(() => {
     const items: Array<{ id: string; label: string }> = [
@@ -60,9 +65,10 @@ export function LogsPage({
       const res = await ipc.readLogTail(effectiveLogId, tailLines);
       setLogPath(res.path || `logs/${effectiveLogId}.log`);
       setLogBytes(res.bytes || 0);
-      setContent(res.content?.trim() ? res.content : "暂无日志");
+      setReadError("");
+      setRawContent(res.content?.trim() ? res.content : "");
     } catch (err) {
-      setContent(`读取失败: ${formatErrorMessage(err)}`);
+      setReadError(formatErrorMessage(err));
     }
   }, [effectiveLogId, tailLines]);
 
@@ -115,11 +121,12 @@ export function LogsPage({
     setClearing(true);
     try {
       await ipc.clearLog(effectiveLogId);
-      setContent("暂无日志");
+      setRawContent("");
+      setReadError("");
       setLogBytes(0);
-      onToast("已清空日志", "ok");
+      onToast(t("已清空日志", "Log cleared"), "ok");
     } catch (err) {
-      onToast(`清空失败：${formatErrorMessage(err)}`, "error");
+      onToast(t(`清空失败：${formatErrorMessage(err)}`, `Clear failed: ${formatErrorMessage(err)}`), "error");
     } finally {
       setClearing(false);
     }
@@ -133,7 +140,7 @@ export function LogsPage({
           <select
             value={effectiveLogId}
             onChange={(e) => onSelectLogId(e.target.value)}
-            aria-label="选择日志源"
+            aria-label={t("选择日志源", "Select log source")}
             className="agy-input min-w-[200px] cursor-pointer font-mono-code text-[12.5px]"
           >
             {sources.map((src) => (
@@ -146,18 +153,18 @@ export function LogsPage({
           <select
             value={tailLines}
             onChange={(e) => setTailLines(Number(e.target.value))}
-            aria-label="日志行数"
+            aria-label={t("日志行数", "Line count")}
             className="agy-input cursor-pointer text-[12.5px]"
           >
-            <option value={100}>最近 100 行</option>
-            <option value={200}>最近 200 行</option>
-            <option value={500}>最近 500 行</option>
+            <option value={100}>{t("最近 100 行", "Last 100 lines")}</option>
+            <option value={200}>{t("最近 200 行", "Last 200 lines")}</option>
+            <option value={500}>{t("最近 500 行", "Last 500 lines")}</option>
           </select>
 
           <SearchInput
             value={filterQuery}
             onChange={setFilterQuery}
-            placeholder="过滤日志关键词..."
+            placeholder={t("过滤日志关键词...", "Filter log keywords...")}
             className="w-[180px]"
           />
 
@@ -176,12 +183,12 @@ export function LogsPage({
               <>
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ok)]" />
                 <Pause className="h-3.5 w-3.5" />
-                <span>暂停</span>
+                <span>{t("暂停", "Pause")}</span>
               </>
             ) : (
               <>
                 <Play className="h-3.5 w-3.5" />
-                <span>继续</span>
+                <span>{t("继续", "Resume")}</span>
               </>
             )}
           </button>
@@ -193,7 +200,7 @@ export function LogsPage({
             className="agy-btn"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>{clearing ? "清空中..." : "清空"}</span>
+            <span>{clearing ? t("清空中...", "Clearing...") : t("清空", "Clear")}</span>
           </button>
         </div>
       </div>
@@ -216,7 +223,7 @@ export function LogsPage({
               className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
             >
               <ArrowDown className="h-3 w-3" />
-              <span>回到底部</span>
+              <span>{t("回到底部", "Scroll to bottom")}</span>
             </motion.button>
           )}
         </AnimatePresence>

@@ -2,6 +2,7 @@ import { SpringSwitch } from "./MotionPrimitives";
 import { useEffect } from "react";
 import { AlertTriangle, Check, Info, Loader2, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useI18n } from "../lib/i18n";
 
 export type ConfirmModalTone = "danger" | "warn" | "info";
 
@@ -35,7 +36,7 @@ export function ConfirmModal({
   open,
   title,
   description,
-  confirmLabel = "确认移除",
+  confirmLabel,
   tone,
   hideCancel = false,
   busy = false,
@@ -47,7 +48,9 @@ export function ConfirmModal({
   onCancel,
   onConfirm,
 }: ConfirmModalProps) {
+  const { t } = useI18n();
   const reducedMotion = useReducedMotion();
+  const resolvedConfirmLabel = confirmLabel ?? t("确认移除", "Remove");
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +62,7 @@ export function ConfirmModal({
   }, [open, busy, onCancel]);
 
   const resolvedTone: ConfirmModalTone =
-    tone ?? (confirmLabel === "知道了" ? "warn" : "danger");
+    tone ?? (resolvedConfirmLabel === "知道了" || resolvedConfirmLabel === "Got it" ? "warn" : "danger");
 
   const badgeStyles =
     resolvedTone === "danger"
@@ -182,7 +185,7 @@ export function ConfirmModal({
                 type="button"
                 disabled={busy}
                 onClick={onCancel}
-                aria-label="关闭弹窗"
+                aria-label={t("关闭弹窗", "Close dialog")}
                 className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <X className="h-4 w-4" />
@@ -198,7 +201,7 @@ export function ConfirmModal({
                   onClick={onCancel}
                   className="agy-btn h-9 px-4"
                 >
-                  取消
+                  {t("取消", "Cancel")}
                 </button>
               )}
               <button
@@ -210,12 +213,12 @@ export function ConfirmModal({
                 {busy ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>处理中...</span>
+                    <span>{t("处理中...", "Processing...")}</span>
                   </>
                 ) : (
                   <>
                     <ConfirmIcon className="h-3.5 w-3.5" />
-                    <span>{confirmLabel}</span>
+                    <span>{resolvedConfirmLabel}</span>
                   </>
                 )}
               </button>
