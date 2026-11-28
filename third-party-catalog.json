@@ -1,6 +1,37 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-24T09:30:00Z",
-  "plugins": []
+  "updatedAt": "2026-11-28T07:54:29Z",
+  "plugins": [
+    {
+      "id": "wsnmm3.agy-selection-translate",
+      "name": "划词翻译 · Selection Translate",
+      "version": "2.0.1",
+      "author": "wsnmm3",
+      "description": "独立的 Antigravity 划词翻译插件——选中英文先弹出「翻译」按钮，点击才发起翻译，支持长文本分段与浅/深色双主题。",
+      "type": "node-cdp",
+      "downloadUrl": "https://github.com/wsnmm3/agy-selection-translate/releases/download/v2.0.1/wsnmm3.agy-selection-translate-v2.0.1.zip",
+      "homepage": "https://github.com/wsnmm3/agy-selection-translate",
+      "changelog": "### 更新内容\n- 新增 \u0007gy-plugin.json（id: wsnmm3.agy-selection-translate，\type: node-cdp），原生兼容 [AGY-Dock](https://github.com/haoan33/AGY-Dock) 第三方市场一键安装与自动更新\n- [server/translate_mcp.mjs](server/translate_mcp.mjs) 新增 --daemon / --stop 无头单实例守护模式，保留原有 Antigravity MCP stdio 模式不变\n- 随包附带 wsnmm3.agy-selection-translate-v2.0.1.zip（已通过 AGY-Dock/scripts/scan-plugin.mjs 安全扫描）",
+      "sha256": "1679da4cc631be67dfaf9e6eec74f0729cbe90d51fc0523418ccb0dea1072888",
+      "size": 11507,
+      "publishedAt": "2026-11-28T07:52:57Z",
+      "releaseTag": "v2.0.1",
+      "upstreamRepo": "wsnmm3/agy-selection-translate",
+      "riskLevel": "low",
+      "riskFindings": [
+        {
+          "severity": "low",
+          "code": "EXTERNAL_NETWORK",
+          "title": "向外部网址发送或请求数据",
+          "detail": "代码会连接外部地址：translate.googleapis.com、api.mymemory.translated.net",
+          "file": "src/translate-inject.js",
+          "targets": [
+            "translate.googleapis.com",
+            "api.mymemory.translated.net"
+          ]
+        }
+      ]
+    }
+  ]
 }
