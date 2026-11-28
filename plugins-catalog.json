@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-25T14:18:35Z",
+  "updatedAt": "2026-11-28T04:34:13Z",
   "plugins": [
     {
       "id": "office-viewer",
@@ -20,15 +20,15 @@
     {
       "id": "antigravity-hans",
       "name": "Antigravity Hans (动态汉化)",
-      "version": "0.7.11",
+      "version": "0.7.13",
       "author": "HaoAn",
       "description": "纯 Node.js CDP 动态注入引擎，实时汉化 Antigravity 界面、Agent 面板与 Swarm 看板，并支持保留 Google Sans 西文的中文字体与字重设置（无任何 .exe 二进制，零杀软误报）。",
       "type": "node-cdp",
-      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/antigravity-hans-v0.7.11.zip",
+      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/v2.4.0/antigravity-hans-v0.7.13.zip",
       "homepage": "https://github.com/haoan33/AGY-Dock",
-      "changelog": "- 补全右上角更新按钮与提示汉化：新增“下载更新”“正在下载更新”“安装更新”“正在安装更新”“重启以更新”“正在更新…”“正在检查更新”等全状态按钮和提示翻译。\n- 补全点击更新时的确认弹窗文案：新增“仍然更新”“更新”按钮及进行中对话中断/恢复提醒、超时提示的完整中文翻译。",
-      "sha256": "c84f1a965dd9c30366404f1e7e1451ab1e75c8577a35d42bafb251ec0e387e63",
-      "size": 177715,
+      "changelog": "- 补全 Antigravity 首次打开时的登录界面及新手引导全流程汉化：覆盖欢迎标题、商务/SSO 登录按钮、手动授权码登录提示、账号校验与异常页（含常见问题链接）、订阅/许可证选择页，以及登录后的主题选择、功能介绍、隐私条款与首次启动向导。\n- 新增内嵌登录引导页（`/onboarding`）的自动识别支持，修复此前部分登录引导场景未自动触发汉化以及个别介绍文案半汉化的问题。\n- （含 `v0.7.12` 优化）优化启动连接速度，优先直连本机调试端口，显著降低启动后连不上导致汉化未生效的概率。",
+      "sha256": "5aa4aa2a9c514ea9831367587b264d83c86c47dc55612fc22efccfe27e480292",
+      "size": 180687,
       "releaseTag": "v2.4.0"
     },
     {
