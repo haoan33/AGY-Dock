@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "haoan33/AGY-Dock",
-  "updatedAt": "2026-11-28T04:34:13Z",
+  "updatedAt": "2026-11-28T04:37:29Z",
   "plugins": [
     {
       "id": "office-viewer",
@@ -76,16 +76,16 @@
     {
       "id": "obsidian-prism-lite",
       "name": "Obsidian Prism Lite (黑曜棱镜轻量版)",
-      "version": "1.5.9",
+      "version": "1.6.1",
       "author": "RMvdesi (精简适配: HaoAn)",
       "description": "基于 Obsidian Prism 精简重构的轻量光学界面美化与 WebGPU 离屏渲染动效插件，包含四套深浅配色、磨砂切面质感、多线程离屏首屏波纹与推理深度滑块、边缘微光提醒、代码块折叠及侧栏项目/对话滑块切换。",
       "type": "node-cdp",
-      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/obsidian-prism-lite-v1.5.9/obsidian-prism-lite-v1.5.9.zip",
+      "downloadUrl": "https://github.com/haoan33/AGY-Dock/releases/download/obsidian-prism-lite-v1.6.1/obsidian-prism-lite-v1.6.1.zip",
       "homepage": "https://github.com/RMvdesi/obsidian-prism",
-      "changelog": "- 修复批量归档多个会话时，原生“撤销”提示弹窗出现重叠、位置偏移、文字缺失及悬停展开异常的问题（移除冲突的定位、裁切与额外左边距覆盖，保留原生叠放与悬停桥接区，并将左侧提示细条缩进圆角安全区）。",
-      "sha256": "db6a200758072545d056a2cd33e095b5e15e60dd5aaca1c5c33e727b85f6a783",
-      "size": 239626,
-      "releaseTag": "obsidian-prism-lite-v1.5.9"
+      "changelog": "- 修复开启黑曜棱镜轻量版后，左侧会话栏（新建对话、项目标题、分组标题、会话列表、紧凑模式及项目/对话切换条）字体大小被固定、无法随 Antigravity「外观 → 字体大小」同步缩放的问题，并改为随字号自适应行高以防大字号裁切。\n- 动效渲染帧率新增「无上限（原生满帧）」选项，开启后首页波纹、彩点光环及模型图标动效将跟随显示器原生刷新率满帧运行。\n- 新增 Antigravity 官网同款「彩点光环（弧线聚拢）」首页背景动效：支持在插件设置页切换「点阵波纹（原版）」与「彩点光环（弧线聚拢）」，并可调节彩点疏密、聚拢回弹力度与点击水波涟漪。",
+      "sha256": "a7a5e1dbcc18cf029d47b627d2a18ad74cc742dd52b762e03d74ae3221b44166",
+      "size": 254133,
+      "releaseTag": "obsidian-prism-lite-v1.6.1"
     },
     {
       "id": "rmvdesi.obsidian-prism",
