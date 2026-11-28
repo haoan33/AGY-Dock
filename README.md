@@ -1,125 +1,131 @@
+<div align="center">
+
 # AGY Dock (`AGY-Dock` v2.10.0)
 
-**AGY Dock** (formerly *AGY Plugin Manager* / `AGY-Launcher`) is a decoupled Windows desktop control center, process supervisor, and Chrome DevTools Protocol (CDP) bridge launcher for **Google Antigravity IDE**.
+**AGY Dock**（原 *AGY Plugin Manager* / `AGY-Launcher`）是一个专为 **Google Antigravity IDE** 打造的解耦式 Windows 桌面控制中心、进程管家与 Chrome DevTools Protocol（CDP）桥接启动器。
 
-[Overview](#overview) · [Plugin Integration Spec](PLUGIN_INTEGRATION.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Submit Official Plugin](.github/ISSUE_TEMPLATE/submit-official-plugin.yml) · [Submit Third-Party Plugin](.github/ISSUE_TEMPLATE/submit-third-party-plugin.yml)
+**简体中文** | [English](README_EN.md)
 
----
+[项目简介](#项目简介) · [插件接入规范](PLUGIN_INTEGRATION.md) · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md) · [提交官方插件](.github/ISSUE_TEMPLATE/submit-official-plugin.yml) · [提交第三方插件](.github/ISSUE_TEMPLATE/submit-third-party-plugin.yml)
 
-## Overview
-
-AGY Dock launches **Google Antigravity IDE** cleanly with on-demand proxy injection and orchestrates external plugins without modifying host IDE binaries (`Antigravity.exe`, `app.asar`, or `version.dll`).
-
-### Key Capabilities
-
-- **Clean Host Isolation**: User data (`plugins.json`, `plugins/`, `logs/`, `account-quota-cache.json`) lives under `%LOCALAPPDATA%\AGY-Plugin-Manager` (or next to the executable in portable mode when `plugins.json` or `.portable` is present), separated from bundled binaries.
-- **Dual-Track Plugin Marketplace**:
-  - **Official Marketplace** ([`plugins-catalog.json`](plugins-catalog.json)): Verified plugins audited or maintained for AGY Dock.
-  - **Third-Party Marketplace** ([`third-party-catalog.json`](third-party-catalog.json)): Community plugins hosted in external GitHub repositories with automated two-tier static security screening (`Low`, `Medium`, `High` risk ratings + sensitive capability tags) and custom private repository feeds.
-  - **One-Click Plugin Submission**: Submit official or third-party plugins via GitHub Issue forms or the in-app **Quick Submit** workflow, backed by automated release validation and upstream release synchronization.
-- **Multiple Plugin Runtimes & Safe Bridge**:
-  - Supports `node-cdp`, `exe-cdp`, `node-companion`, `ps-companion`, `py-companion`, and `custom` plugins.
-  - **Manager Safe Process Bridge**: Companion plugins receive a loopback endpoint (`AGY_BRIDGE_URL`) for permissioned local operations without granting raw unconstrained host access.
-- **Workspace, Quota & Storage Tools**:
-  - Live Antigravity quota/telemetry status, native extension inventory, automated IDE & proxy client detection, interactive **Storage Manager** (AGY Local Data & Project Files treemap/list cleanup), and non-blocking update notifications.
+</div>
 
 ---
 
-## Documentation
+## 项目简介
 
-| Document | Purpose |
+AGY Dock 可以干净地启动 **Google Antigravity IDE** 并按需注入代理配置，同时调度各类外部插件，全程不修改宿主 IDE 的原版程序文件（`Antigravity.exe`、`app.asar` 或 `version.dll`）。
+
+### 核心功能
+
+- **纯净宿主机隔离**：用户数据（`plugins.json`、`plugins/`、`logs/`、`account-quota-cache.json`）统一存放在 `%LOCALAPPDATA%\AGY-Plugin-Manager`（当程序旁存在 `plugins.json` 或 `.portable` 时自动切换为便携模式），与安装包自带程序文件彻底分离。
+- **双轨插件市场**：
+  - **官方市场**（[`plugins-catalog.json`](plugins-catalog.json)）：收录经过审核或专为 AGY Dock 维护的官方认证插件。
+  - **第三方市场**（[`third-party-catalog.json`](third-party-catalog.json)）：收录托管在外部 GitHub 仓库的社区插件，自带两级静态安全扫描（`Low` / `Medium` / `High` 风险评级 + 敏感权限标签），并支持添加自定义私有仓库源。
+  - **一键提交插件**：支持通过 GitHub Issue 表单或应用内**快捷提交（Quick Submit）**流程提交官方或第三方插件，自动完成发布包校验与上游版本同步。
+- **多运行时支持与安全桥接**：
+  - 支持 `node-cdp`、`exe-cdp`、`node-companion`、`ps-companion`、`py-companion` 及 `custom` 类型插件。
+  - **Manager 安全进程桥接**：伴随进程类插件可通过本地回环接口（`AGY_BRIDGE_URL`）按权限执行本地操作，避免直接放开无限制的宿主系统权限。
+- **工作区、额度与存储管理工具**：
+  - 实时查看 Antigravity 配额与遥测状态、原生扩展清单、自动识别 IDE 与本地代理客户端、内置交互式**存储管理（Storage Manager）**（支持按树状图/列表清理 AGY 本地数据与项目文件），以及无打扰的更新提醒。
+
+---
+
+## 相关文档
+
+| 文档 | 说明 |
 | :--- | :--- |
-| [`PLUGIN_INTEGRATION.md`](PLUGIN_INTEGRATION.md) | Complete plugin architecture, `agy-plugin.json` manifest contract, dual-track marketplace spec, `settings.html` SDK, and companion safe bridge protocol. |
-| [`CHANGELOG.md`](CHANGELOG.md) | Full release history across desktop app, marketplace, security scanner, and launcher updates. |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Quick guide for submitting plugins to the marketplace and contributing code to AGY Dock. |
+| [`PLUGIN_INTEGRATION.md`](PLUGIN_INTEGRATION.md) | 完整的插件架构、`agy-plugin.json` 清单规范、双轨市场标准、`settings.html` SDK 与伴随进程安全桥接协议。 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 桌面端应用、插件市场、安全扫描器与启动器的完整版本更新记录。 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 向插件市场提交插件及向 AGY Dock 贡献代码的快速指南。 |
 
 ---
 
-## Official Marketplace Catalog & Bundled Packages
+## 官方市场目录与内置插件包
 
-AGY Dock ships sample unified `.zip` packages in [`AGY-Launcher/plugin-packages/`](AGY-Launcher/plugin-packages/) and publishes the official catalog in [`plugins-catalog.json`](plugins-catalog.json):
+AGY Dock 在 [`AGY-Launcher/plugin-packages/`](AGY-Launcher/plugin-packages/) 目录提供标准 `.zip` 示例插件包，并在 [`plugins-catalog.json`](plugins-catalog.json) 发布官方市场目录：
 
-| Plugin ID | Name | Type | Description |
+| 插件 ID | 名称 | 类型 | 简介 |
 | :--- | :--- | :--- | :--- |
-| `office-viewer` | Antigravity Office Viewer | `node-cdp` | Real-time Word, Excel, PowerPoint, and offline PDF preview panel via Antigravity CDP. |
-| `antigravity-hans` | Antigravity Hans | `node-cdp` | Pure Node.js dynamic localization engine for the Antigravity UI, Agent panel, and Swarm board. |
-| `agy-telemetry` | Antigravity Telemetry | `node-cdp` | Minimalist session output speed, cache hit rate, and context usage telemetry HUD. |
-| `agy-quota-badge` | Antigravity Quota Badge | `node-cdp` | Live 5-hour and weekly quota badge beside the model selector with countdown tooltips and custom styling. |
-| `agy-pixel-pets` | AGY Pixel Pets | `node-cdp` | Hardware-accelerated interactive pixel companions synced with Antigravity AI activity. |
-| `obsidian-prism-lite` | Obsidian Prism Lite | `node-cdp` | Lightweight optical theme enhancement with multi-theme palettes, animations, and sidebar controls. |
+| `office-viewer` | Antigravity Office Viewer | `node-cdp` | 通过 Antigravity CDP 提供 Word、Excel、PowerPoint 与离线 PDF 高清实时预览面板。 |
+| `antigravity-hans` | Antigravity Hans | `node-cdp` | 纯 Node.js 动态汉化引擎，实时翻译 Antigravity 界面、Agent 面板与 Swarm 看板。 |
+| `agy-telemetry` | Antigravity Telemetry | `node-cdp` | 极简会话输出速度、缓存命中率与上下文使用占比实时监控浮窗。 |
+| `agy-quota-badge` | Antigravity Quota Badge | `node-cdp` | 在模型选择器旁显示 5 小时与周额度徽章，支持悬停查看重置倒计时与自定义配色。 |
+| `agy-pixel-pets` | AGY Pixel Pets | `node-cdp` | 硬件加速的交互式像素桌面宠物，可随 Antigravity AI 活动状态实时互动。 |
+| `obsidian-prism-lite` | Obsidian Prism Lite | `node-cdp` | 轻量级光学界面美化插件，内置多套深浅配色主题、动效与侧栏快捷控制。 |
 
-Each package carries a root `agy-plugin.json` manifest (`schemaVersion: 1`). See [`PLUGIN_INTEGRATION.md`](PLUGIN_INTEGRATION.md) for the full packaging and distribution specification.
+每个插件包根目录均包含 `agy-plugin.json` 清单文件（`schemaVersion: 1`）。完整打包与分发规范请参阅 [`PLUGIN_INTEGRATION.md`](PLUGIN_INTEGRATION.md)。
 
 ---
 
-## Installation & Quick Start
+## 安装与快速上手
 
-### Option 1: Standalone Windows Setup Installer (Recommended)
+### 方式一：独立 Windows 安装包（推荐）
 
-1. Download or build `dist-release/AGY-Dock-Setup-v2.10.0.exe`.
-2. Run the setup wizard:
-   - Automatically detects your local `Antigravity.exe` installation (with manual browse override).
-   - Installs clean manager binaries to `%LOCALAPPDATA%\AGY-Plugin-Manager` by default while preserving existing configurations and plugins on upgrade.
-   - Creates **Desktop** and **Start Menu** shortcuts (`AGY Dock`), then launches immediately.
-3. Silent installation for automation or CI:
+1. 下载或自行构建 `dist-release/AGY-Dock-Setup-v2.10.0.exe`。
+2. 运行安装向导：
+   - 自动扫描本机 `Antigravity.exe` 安装位置（也可手动浏览指定）。
+   - 默认将纯净的管理端程序安装到 `%LOCALAPPDATA%\AGY-Plugin-Manager`，升级时自动保留现有配置与已装插件。
+   - 自动创建**桌面**和**开始菜单**快捷方式（`AGY Dock`），安装完成后立即启动。
+3. 支持自动化或 CI 静默安装：
    ```powershell
    .\AGY-Dock-Setup-v2.10.0.exe /S
    ```
 
-### Option 2: Installing Plugins (Marketplace or Drag-and-Drop)
+### 方式二：安装插件（插件市场或拖拽安装包）
 
-1. Open **AGY Dock** and install plugins directly from the **Plugin Marketplace** (Official or Third-Party tabs).
-2. Or go to **My Plugins** and drag and drop any `.zip`, `.agypkg`, or `.agy-plugin` archive onto the window (or click **Install Package**).
-3. AGY Dock validates archive paths (blocking path traversal), checks `agy-plugin.json`, runs static security screening when required, extracts files to `plugins/<id>/`, and registers the plugin in `plugins.json`.
-
----
-
-## Auto-Detection, Storage & Updates
-
-- **Antigravity IDE Detection**: Locates `Antigravity.exe` across active processes, Windows Registry entries (`Uninstall`, `App Paths`, URL protocol), standard local app folders (`%LOCALAPPDATA%\Programs\antigravity\Antigravity.exe`), and shortcuts.
-- **Local Proxy Detection**: Reads Windows Internet Settings (`ProxyEnable` / `ProxyServer`), environment variables, and common proxy clients (`Clash`, `Mihomo`, `Clash Verge`, `FlClash`, `v2ray`, `xray`, `sing-box`, `Hiddify`, `Shadowsocks`) to prefill on-demand proxy launch settings without altering system-wide proxy configuration.
-- **Storage Management**: Switch between **AGY Local Data** and **Project Files** to inspect large directories, browse nested folders, and safely clean caches while keeping registered project roots intact.
-- **Update Service**: Checks `https://www.haoanlab.xyz` on startup, every 15 minutes, and manually from **Settings**. Existing `ahmustudyhelper.xyz` configurations remain compatible during migration.
+1. 打开 **AGY Dock**，直接在**插件市场**（官方或第三方标签页）点击安装所需插件。
+2. 也可以进入**我的插件**页面，直接将 `.zip`、`.agypkg` 或 `.agy-plugin` 压缩包拖入窗口（或点击**安装插件包**）。
+3. AGY Dock 会自动校验压缩包路径（拦截路径穿越风险）、检查 `agy-plugin.json`、按需执行静态安全扫描，并将文件解压到 `plugins/<id>/` 后登记到 `plugins.json`。
 
 ---
 
-## Development & Building from Source
+## 自动识别、存储清理与更新服务
 
-### Prerequisites
+- **Antigravity IDE 自动识别**：从运行中进程、Windows 注册表（`Uninstall`、`App Paths`、URL 协议）、常见默认安装路径（`%LOCALAPPDATA%\Programs\antigravity\Antigravity.exe`）及快捷方式中自动定位 `Antigravity.exe`。
+- **本地代理自动识别**：自动读取 Windows 网络设置（`ProxyEnable` / `ProxyServer`）、环境变量及常见代理客户端（`Clash`、`Mihomo`、`Clash Verge`、`FlClash`、`v2ray`、`xray`、`sing-box`、`Hiddify`、`Shadowsocks`），一键预填按需代理参数，绝不修改全局系统代理。
+- **存储管理**：可在 **AGY 本地数据** 与 **项目文件** 之间切换，直观查看大体积目录、浏览子文件夹并安全清理缓存，同时完整保护已登记的项目根目录。
+- **更新服务**：在启动时、每隔 15 分钟以及在**设置**中手动检查时请求 `https://www.haoanlab.xyz`；旧版 `ahmustudyhelper.xyz` 配置在迁移期间仍保持兼容。
 
-- Node.js 22+ and npm
-- Rust stable toolchain (`x86_64-pc-windows-msvc`) and Tauri v2 Windows build prerequisites
-- Python 3.11+ (for packaging plugin archives)
+---
 
-### Run from Source
+## 开发与源码构建
+
+### 环境准备
+
+- Node.js 22+ 与 npm
+- Rust 稳定版工具链（`x86_64-pc-windows-msvc`）及 Tauri v2 Windows 编译环境
+- Python 3.11+（用于打包插件压缩包）
+
+### 从源码启动
 
 ```powershell
 npm ci
 npm run tauri:dev
 ```
 
-### Build Unified Plugin Packages
+### 打包标准插件包
 
 ```powershell
 cd AGY-Launcher
 python scripts/package_plugins.py
 ```
 
-### Scan a Plugin Package Locally
+### 本地安全扫描插件包
 
 ```powershell
 node scripts/scan-plugin.mjs path/to/plugin.zip
 ```
 
-### Build Windows Desktop App & Setup Installer
+### 构建 Windows 桌面端与安装程序
 
 ```powershell
 node scripts/build.mjs windows x64
 ```
 
-The build writes `dist-release/AGY-Dock-Setup-v<VERSION>.exe`.
+构建产物会输出到 `dist-release/AGY-Dock-Setup-v<VERSION>.exe`。
 
-### Run Tests
+### 运行测试
 
 ```powershell
 npm run build
